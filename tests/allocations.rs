@@ -245,3 +245,47 @@ fn borrowed_geometry_never_allocates_command_buffers() {
         assert_eq!(counts.reallocations, 0);
     }
 }
+
+#[test]
+fn reader_allocates_per_layer_instead_of_per_tagged_feature() {
+    use buffa::Message as _;
+    use fast_mvt::proto::{Feature, Layer, Tile, Value};
+
+    for count in [1_usize, 5, 10_000] {
+        let bytes = Tile {
+            layers: vec![Layer {
+                version: 2,
+                name: "test".into(),
+                keys: vec!["key".into()],
+                values: vec![Value {
+                    string_value: Some("value".into()),
+                    ..Default::default()
+                }],
+                features: (0..count)
+                    .map(|id| Feature {
+                        id: Some(id as u64),
+                        tags: vec![0, 0],
+                        ..Default::default()
+                    })
+                    .collect(),
+                ..Default::default()
+            }],
+        }
+        .encode_to_vec();
+        let (reader, counts) = measure(|| MvtReaderRef::new(black_box(&bytes)).unwrap());
+        // Tile layers, layer features, keys, values, and shared tags.
+        assert_eq!(counts.allocations, 5);
+        assert_eq!(counts.reallocations, 0);
+        let (cloned, counts) = measure(|| reader.clone());
+        assert_eq!(counts.allocations, 5);
+        assert_eq!(counts.reallocations, 0);
+        drop(reader);
+        let layer = cloned.layers().next().unwrap();
+        assert_eq!(layer.feature_count(), count);
+        for (id, feature) in layer.features().enumerate() {
+            assert_eq!(feature.id(), Some(id as u64));
+            assert_eq!(feature.tags(), [0, 0]);
+            assert_eq!(feature.properties().next().unwrap().unwrap().0, "key");
+        }
+    }
+}

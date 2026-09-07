@@ -1,3 +1,4 @@
+mod capacity;
 mod commands;
 mod feature;
 mod layer;

@@ -20,6 +20,10 @@ impl Tile {
 pub struct MvtReaderRef<'a>(TileView<'a>);
 
 impl<'a> MvtReaderRef<'a> {
+    /// Validate the protobuf wire data and borrow its contents.
+    ///
+    /// Structural sizing precedes value decoding. A malformed message with
+    /// multiple faults may report a structural error before a value error.
     pub fn new(data: &'a [u8]) -> MvtResult<Self> {
         let tile = TileView::decode(data)?;
         for layer in &tile.layers {

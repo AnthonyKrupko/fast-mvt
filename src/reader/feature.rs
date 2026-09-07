@@ -28,7 +28,7 @@ impl<'a> MvtFeatureRef<'a> {
 
     #[must_use]
     pub fn tags(self) -> &'a [u32] {
-        &self.feature.tags
+        &self.layer.tags[self.feature.tags.clone()]
     }
 
     /// Iterate over borrowed command integers without allocating a command buffer.
@@ -54,11 +54,7 @@ impl<'a> MvtFeatureRef<'a> {
 
     #[must_use]
     pub fn properties(self) -> MvtPropertyIter<'a> {
-        MvtPropertyIter::new(
-            &self.layer.keys,
-            &self.layer.values,
-            self.feature.tags.chunks(2),
-        )
+        MvtPropertyIter::new(&self.layer.keys, &self.layer.values, self.tags().chunks(2))
     }
 
     pub fn properties_vec(self) -> MvtResult<Vec<(&'a str, MvtValueRef<'a>)>> {
