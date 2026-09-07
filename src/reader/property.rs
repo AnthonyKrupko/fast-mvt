@@ -1,21 +1,45 @@
 use std::fmt;
 
+use buffa::{DecodeContext, DecodeError, MessageView as _};
 use usize_cast::IntoUsize;
 
 use crate::generated::vector_tile::tile as proto_tile;
 use crate::{MvtError, MvtResult, MvtValue};
 
+/// Resolve the property value once, but retain its wire message so `to_proto()`
+/// preserves every populated protobuf field, including fields hidden by the
+/// property API's type precedence. Strings continue to borrow the input tile.
+#[derive(Clone, Debug)]
+pub(super) struct ValueEntry<'a> {
+    pub value: MvtValueRef<'a>,
+    raw: &'a [u8],
+}
+
+impl<'a> ValueEntry<'a> {
+    pub(super) fn decode(raw: &'a [u8], ctx: DecodeContext<'_>) -> Result<Self, DecodeError> {
+        let view = proto_tile::ValueView::decode_view_ctx(raw, ctx)?;
+        Ok(Self {
+            value: value_ref(&view),
+            raw,
+        })
+    }
+
+    pub(super) fn to_proto(&self) -> Result<proto_tile::Value, DecodeError> {
+        proto_tile::ValueView::decode_view(self.raw)?.to_owned_message()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct MvtPropertyIter<'a> {
     keys: &'a [&'a str],
-    values: &'a [proto_tile::ValueView<'a>],
+    values: &'a [ValueEntry<'a>],
     tags: std::slice::Chunks<'a, u32>,
 }
 
 impl<'a> MvtPropertyIter<'a> {
-    pub(crate) fn new(
+    pub(super) fn new(
         keys: &'a [&'a str],
-        values: &'a [proto_tile::ValueView<'a>],
+        values: &'a [ValueEntry<'a>],
         tags: std::slice::Chunks<'a, u32>,
     ) -> Self {
         Self { keys, values, tags }
@@ -35,7 +59,7 @@ impl<'a> Iterator for MvtPropertyIter<'a> {
             None => return Some(Err(MvtError::InvalidKeyIndex(*key_idx))),
         };
         let value = match self.values.get((*value_idx).into_usize()) {
-            Some(value) => value_ref(value),
+            Some(value) => value.value,
             None => return Some(Err(MvtError::InvalidValueIndex(*value_idx))),
         };
         Some(Ok((key, value)))
@@ -86,7 +110,7 @@ impl fmt::Debug for MvtValueRef<'_> {
     }
 }
 
-pub(crate) fn value_ref<'a>(value: &'a proto_tile::ValueView<'a>) -> MvtValueRef<'a> {
+fn value_ref<'a>(value: &proto_tile::ValueView<'a>) -> MvtValueRef<'a> {
     if let Some(value) = value.string_value {
         MvtValueRef::String(value)
     } else if let Some(value) = value.float_value {

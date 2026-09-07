@@ -2,7 +2,7 @@ use std::fmt;
 use std::num::NonZeroU32;
 
 use super::feature::MvtFeatureRef;
-use super::property::{MvtValueRef, value_ref};
+use super::property::MvtValueRef;
 use super::wire::LayerView;
 use crate::{DEFAULT_EXTENT, MvtError, MvtLayer, MvtResult};
 
@@ -46,7 +46,7 @@ impl<'a> MvtLayerRef<'a> {
 
     #[must_use]
     pub fn values(self) -> impl ExactSizeIterator<Item = MvtValueRef<'a>> {
-        self.0.values.iter().map(value_ref)
+        self.0.values.iter().map(|v| v.value)
     }
 
     #[must_use]

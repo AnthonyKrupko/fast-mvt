@@ -5,9 +5,10 @@
 use std::cell::Cell;
 
 use buffa::encoding::{Tag, WireType, check_wire_type, skip_field_depth};
-use buffa::{DecodeContext, DecodeError, Enumeration as _, MessageView as _, types};
+use buffa::{DecodeContext, DecodeError, Enumeration as _, types};
 
 use super::commands::GeometryFields;
+use super::property::ValueEntry;
 use crate::generated::vector_tile::{Tile, tile as proto};
 
 #[derive(Clone, Default)]
@@ -21,7 +22,7 @@ pub(super) struct LayerView<'a> {
     pub name: &'a str,
     pub features: Vec<FeatureView<'a>>,
     pub keys: Vec<&'a str>,
-    pub values: Vec<proto::ValueView<'a>>,
+    pub values: Vec<ValueEntry<'a>>,
     pub extent: Option<u32>,
 }
 
@@ -72,7 +73,7 @@ impl<'a> TileView<'a> {
                 values: layer
                     .values
                     .iter()
-                    .map(buffa::MessageView::to_owned_message)
+                    .map(ValueEntry::to_proto)
                     .collect::<Result<_, _>>()?,
                 extent: layer.extent,
             });
@@ -113,9 +114,7 @@ impl<'a> LayerView<'a> {
                     check_wire_type(tag, WireType::LengthDelimited)?;
                     let subctx = ctx.descend()?;
                     let sub = types::borrow_bytes(&mut cur)?;
-                    layer
-                        .values
-                        .push(proto::ValueView::decode_view_ctx(sub, subctx)?);
+                    layer.values.push(ValueEntry::decode(sub, subctx)?);
                 }
                 _ => skip_field_depth(tag, &mut cur, ctx.depth())?,
             }
@@ -169,7 +168,9 @@ impl<'a> FeatureView<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::MvtValueRef;
     use crate::generated::vector_tile::TileView as GeneratedTileView;
+    use buffa::MessageView as _;
 
     fn bytes_field(tag: u8, value: &[u8]) -> Vec<u8> {
         let mut bytes = vec![tag];
@@ -194,6 +195,49 @@ mod tests {
                 panic!("wire readers disagree: {actual:?} != {expected:?}; {bytes:?}")
             }
         }
+    }
+
+    #[test]
+    fn compact_values_preserve_all_proto_fields() {
+        use buffa::Message as _;
+        let original = Tile {
+            layers: vec![proto::Layer {
+                version: 2,
+                name: "x".into(),
+                keys: vec!["k".into()],
+                values: vec![proto::Value {
+                    string_value: Some("text".into()),
+                    uint_value: Some(9),
+                    bool_value: Some(true),
+                    ..Default::default()
+                }],
+                features: vec![proto::Feature {
+                    tags: vec![0, 0],
+                    r#type: Some(proto::GeomType::Point),
+                    geometry: vec![9, 0, 0],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        let bytes = original.encode_to_vec();
+        let reader = crate::MvtReaderRef::new(&bytes).unwrap();
+        assert_eq!(reader.to_proto().unwrap(), original);
+        let layer = reader.layers().next().unwrap();
+        assert_eq!(layer.values().next().unwrap(), MvtValueRef::String("text"));
+        assert_eq!(
+            layer
+                .features()
+                .next()
+                .unwrap()
+                .properties()
+                .next()
+                .unwrap()
+                .unwrap()
+                .1,
+            MvtValueRef::String("text")
+        );
+        assert!(size_of::<ValueEntry>() < size_of::<proto::ValueView>());
     }
 
     #[test]
