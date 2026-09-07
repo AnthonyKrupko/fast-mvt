@@ -10,7 +10,7 @@ pub(crate) fn encode_geometry(geometry: &MvtGeometry) -> MvtResult<(GeomType, Ve
     match geometry {
         MvtGeometry::Point(point) => {
             let coords = [point.0];
-            let mut encoder = GeometryEncoder::with_capacity(coords.len());
+            let mut encoder = GeometryEncoder::with_capacity(3);
             encoder.points(coords)?;
             Ok((GeomType::Point, encoder.into_data()))
         }
@@ -18,12 +18,12 @@ pub(crate) fn encode_geometry(geometry: &MvtGeometry) -> MvtResult<(GeomType, Ve
             if points.0.is_empty() {
                 return Ok((GeomType::Point, Vec::new()));
             }
-            let mut encoder = GeometryEncoder::with_capacity(points.0.len());
+            let mut encoder = GeometryEncoder::with_capacity(1 + points.0.len() * 2);
             encoder.points(points.0.iter().map(|point| point.0))?;
             Ok((GeomType::Point, encoder.into_data()))
         }
         MvtGeometry::LineString(line) => {
-            let mut encoder = GeometryEncoder::with_capacity(line.0.len());
+            let mut encoder = GeometryEncoder::with_capacity(line_command_len(line.0.len()));
             encoder.line(line)?;
             Ok((GeomType::Linestring, encoder.into_data()))
         }
@@ -31,7 +31,11 @@ pub(crate) fn encode_geometry(geometry: &MvtGeometry) -> MvtResult<(GeomType, Ve
             if lines.0.is_empty() {
                 return Ok((GeomType::Linestring, Vec::new()));
             }
-            let capacity = lines.0.iter().map(|line| line.0.len()).sum();
+            let capacity = lines
+                .0
+                .iter()
+                .map(|line| line_command_len(line.0.len()))
+                .sum();
             let mut encoder = GeometryEncoder::with_capacity(capacity);
             for line in &lines.0 {
                 encoder.line(line)?;
@@ -39,7 +43,7 @@ pub(crate) fn encode_geometry(geometry: &MvtGeometry) -> MvtResult<(GeomType, Ve
             Ok((GeomType::Linestring, encoder.into_data()))
         }
         MvtGeometry::Polygon(polygon) => {
-            let mut encoder = GeometryEncoder::with_capacity(polygon_vertex_count(polygon));
+            let mut encoder = GeometryEncoder::with_capacity(polygon_command_len(polygon));
             encoder.polygon(polygon)?;
             Ok((GeomType::Polygon, encoder.into_data()))
         }
@@ -47,7 +51,7 @@ pub(crate) fn encode_geometry(geometry: &MvtGeometry) -> MvtResult<(GeomType, Ve
             if polygons.0.is_empty() {
                 return Ok((GeomType::Polygon, Vec::new()));
             }
-            let capacity = polygons.0.iter().map(polygon_vertex_count).sum();
+            let capacity = polygons.0.iter().map(polygon_command_len).sum();
             let mut encoder = GeometryEncoder::with_capacity(capacity);
             for polygon in &polygons.0 {
                 encoder.polygon(polygon)?;
@@ -66,13 +70,15 @@ pub(crate) fn encode_geometry(geometry: &MvtGeometry) -> MvtResult<(GeomType, Ve
     }
 }
 
-fn polygon_vertex_count(polygon: &MvtPolygon) -> usize {
-    polygon.exterior().0.len()
-        + polygon
-            .interiors()
-            .iter()
-            .map(|line| line.0.len())
-            .sum::<usize>()
+// MoveTo, two delta words per coordinate, and LineTo for all but singletons.
+fn line_command_len(coords: usize) -> usize {
+    1 + coords * 2 + usize::from(coords > 1)
+}
+
+fn polygon_command_len(polygon: &MvtPolygon) -> usize {
+    let ring_len =
+        |ring: &MvtLineString| line_command_len(without_trailing_duplicate(&ring.0).len()) + 1;
+    ring_len(polygon.exterior()) + polygon.interiors().iter().map(ring_len).sum::<usize>()
 }
 
 struct GeometryEncoder {
@@ -81,9 +87,9 @@ struct GeometryEncoder {
 }
 
 impl GeometryEncoder {
-    fn with_capacity(coords: usize) -> Self {
+    fn with_capacity(words: usize) -> Self {
         Self {
-            data: Vec::with_capacity(1 + coords.saturating_mul(2)),
+            data: Vec::with_capacity(words),
             cursor: MvtCoord { x: 0, y: 0 },
         }
     }
