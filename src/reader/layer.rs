@@ -3,14 +3,14 @@ use std::num::NonZeroU32;
 
 use super::feature::MvtFeatureRef;
 use super::property::{MvtValueRef, value_ref};
-use crate::generated::vector_tile::tile as proto_tile;
+use super::wire::LayerView;
 use crate::{DEFAULT_EXTENT, MvtError, MvtLayer, MvtResult};
 
 #[derive(Copy, Clone)]
-pub struct MvtLayerRef<'a>(&'a proto_tile::LayerView<'a>);
+pub struct MvtLayerRef<'a>(&'a LayerView<'a>);
 
 impl<'a> MvtLayerRef<'a> {
-    pub(crate) fn new(view: &'a proto_tile::LayerView<'a>) -> Self {
+    pub(super) fn new(view: &'a LayerView<'a>) -> Self {
         Self(view)
     }
 

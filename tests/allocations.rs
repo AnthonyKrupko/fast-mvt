@@ -194,3 +194,54 @@ fn owned_layer_features_do_not_reallocate() {
         }
     }
 }
+
+#[test]
+fn borrowed_geometry_never_allocates_command_buffers() {
+    use buffa::Message as _;
+    use fast_mvt::proto::{Feature, GeomType, Layer, Tile};
+
+    for coordinate_count in [1, 100, 10_000] {
+        let mut geometry = vec![9, 0, 0];
+        if coordinate_count > 1 {
+            geometry.push(((coordinate_count - 1) << 3) | 2);
+            for _ in 1..coordinate_count {
+                geometry.extend([2, 4]);
+            }
+        }
+        let bytes = Tile {
+            layers: vec![Layer {
+                version: 2,
+                name: "test".into(),
+                features: vec![Feature {
+                    id: Some(7),
+                    r#type: Some(GeomType::Linestring),
+                    geometry,
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        }
+        .encode_to_vec();
+        let (reader, counts) = measure(|| MvtReaderRef::new(black_box(&bytes)).unwrap());
+        // Only the layer and feature lists, independent of command count.
+        assert_eq!(counts.allocations, 2);
+        assert_eq!(counts.reallocations, 0);
+        let feature = reader.layers().next().unwrap().features().next().unwrap();
+        let ((), counts) = measure(|| {
+            assert_eq!(black_box(feature).id(), Some(7));
+            assert_eq!(feature.properties().count(), 0);
+            for command in feature.geometry_commands() {
+                black_box(command);
+            }
+        });
+        assert_eq!(counts.allocations, 0);
+        assert_eq!(counts.reallocations, 0);
+        let (geometry, counts) = measure(|| feature.geometry().unwrap());
+        let MvtGeometry::LineString(line) = geometry else {
+            panic!("expected line");
+        };
+        assert_eq!(line.0.len(), coordinate_count as usize);
+        assert_eq!(counts.allocations, 1);
+        assert_eq!(counts.reallocations, 0);
+    }
+}

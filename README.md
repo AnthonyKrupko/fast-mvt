@@ -54,6 +54,15 @@ fn read_tile(bytes: &[u8]) -> MvtResult<()> {
 }
 ```
 
+The reader validates protobuf wire data when it is created and borrows geometry
+commands from the input bytes. Reading IDs and properties does not allocate
+geometry command buffers. `feature.geometry()` decodes directly into coordinates;
+it does not cache the result, so retain the returned geometry if you need it again.
+
+`feature.geometry_commands()` returns a cloneable `ExactSizeIterator<Item = u32>`.
+Use `.len()` to inspect the command count without decoding it, iterate to inspect
+individual commands, or `.collect::<Vec<u32>>()` to obtain an owned buffer.
+
 ## Encoding a tile
 
 The simplest path starts a layer with `MvtLayerBuilder::new()`, adds features and

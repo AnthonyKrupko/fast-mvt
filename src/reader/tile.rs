@@ -1,9 +1,8 @@
 use std::fmt;
 
-use buffa::MessageView as _;
-
 use super::MvtLayerRef;
-use crate::generated::vector_tile::{Tile, TileView};
+use super::wire::TileView;
+use crate::generated::vector_tile::Tile;
 use crate::types::DEFAULT_EXTENT;
 use crate::{MvtError, MvtResult, MvtTile};
 
@@ -22,7 +21,7 @@ pub struct MvtReaderRef<'a>(TileView<'a>);
 
 impl<'a> MvtReaderRef<'a> {
     pub fn new(data: &'a [u8]) -> MvtResult<Self> {
-        let tile = TileView::decode_view(data)?;
+        let tile = TileView::decode(data)?;
         for layer in &tile.layers {
             if layer.name.is_empty() {
                 return Err(MvtError::MissingLayerName);
@@ -56,7 +55,7 @@ impl<'a> MvtReaderRef<'a> {
     }
 
     pub fn to_proto(&self) -> MvtResult<Tile> {
-        Ok(self.0.to_owned_message()?)
+        Ok(self.0.to_proto()?)
     }
 }
 
@@ -166,7 +165,10 @@ mod tests {
             feature.tags(),
             [0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7]
         );
-        assert_eq!(feature.geometry_commands(), [9, 2, 4, 9, 6, 8]);
+        assert_eq!(
+            feature.geometry_commands().collect::<Vec<_>>(),
+            [9, 2, 4, 9, 6, 8]
+        );
         assert_eq!(feature.geom_type(), Some(proto_tile::GeomType::Point));
         assert_eq!(feature.geom_type_value(), Some(1));
 

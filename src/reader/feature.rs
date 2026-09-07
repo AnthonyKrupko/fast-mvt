@@ -3,22 +3,21 @@ use std::fmt::{self, Write as _};
 use buffa::Enumeration as _;
 use geo_types::{Coord, Geometry, LineString, Point, Polygon};
 
+use super::commands::MvtGeometryCommands;
 use super::property::{MvtPropertyIter, MvtValueRef};
+use super::wire::{FeatureView, LayerView};
 use crate::generated::vector_tile::tile as proto_tile;
 use crate::geom_reader::decode_geometry;
 use crate::{MvtFeature, MvtGeometry, MvtResult};
 
 #[derive(Copy, Clone)]
 pub struct MvtFeatureRef<'a> {
-    layer: &'a proto_tile::LayerView<'a>,
-    feature: &'a proto_tile::FeatureView<'a>,
+    layer: &'a LayerView<'a>,
+    feature: &'a FeatureView<'a>,
 }
 
 impl<'a> MvtFeatureRef<'a> {
-    pub(crate) fn new(
-        layer: &'a proto_tile::LayerView<'a>,
-        feature: &'a proto_tile::FeatureView<'a>,
-    ) -> Self {
+    pub(super) fn new(layer: &'a LayerView<'a>, feature: &'a FeatureView<'a>) -> Self {
         Self { layer, feature }
     }
 
@@ -32,9 +31,10 @@ impl<'a> MvtFeatureRef<'a> {
         &self.feature.tags
     }
 
+    /// Iterate over borrowed command integers without allocating a command buffer.
     #[must_use]
-    pub fn geometry_commands(self) -> &'a [u32] {
-        &self.feature.geometry
+    pub fn geometry_commands(self) -> MvtGeometryCommands<'a> {
+        self.feature.geometry.iter()
     }
 
     #[must_use]
@@ -70,7 +70,7 @@ impl<'a> MvtFeatureRef<'a> {
     }
 
     pub fn geometry(self) -> MvtResult<MvtGeometry> {
-        decode_geometry(self.geom_type(), &self.feature.geometry)
+        decode_geometry(self.geom_type(), self.geometry_commands())
     }
 
     pub fn to_feature(self) -> MvtResult<MvtFeature> {
