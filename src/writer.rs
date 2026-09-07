@@ -1,5 +1,9 @@
+use std::borrow::Cow;
+use std::hash::{Hash, Hasher};
+
 use buffa::Message as _;
-use dup_indexer::{DupIndexer, DupIndexerRefs, PtrRead};
+use dup_indexer::{DefaultHashBuilder, DupIndexerRefs};
+use indexmap::{Equivalent, IndexSet};
 use usize_cast::IntoUsize;
 
 use crate::generated::vector_tile::Tile;
@@ -85,7 +89,7 @@ pub(crate) fn encode_tile_ref(tile: &MvtTile) -> MvtResult<Vec<u8>> {
                 layer_bld.feature_with_capacity(&feature.geometry, feature.properties.len())?;
             feature_bld.id(feature.id);
             for (key, value) in &feature.properties {
-                feature_bld.tag(key, value.clone())?;
+                feature_bld.tag_ref(key, value)?;
             }
             layer_bld = feature_bld.end();
         }
@@ -99,7 +103,7 @@ pub struct MvtLayerBuilder {
     tile: MvtTileBuilder,
     layer: Layer,
     keys: DupIndexerRefs<String>,
-    values: DupIndexer<MvtValue>,
+    values: IndexSet<MvtValue, DefaultHashBuilder>,
 }
 
 impl MvtLayerBuilder {
@@ -134,7 +138,7 @@ impl MvtLayerBuilder {
                 extent: Some(DEFAULT_EXTENT.get()),
             },
             keys: DupIndexerRefs::new(),
-            values: DupIndexer::new(),
+            values: IndexSet::with_hasher(DefaultHashBuilder::default()),
         }
     }
 
@@ -230,21 +234,51 @@ impl MvtFeatureBuilder {
         value: impl Into<MvtValue>,
     ) -> MvtResult<&mut Self> {
         let value = value.into();
-        if value != MvtValue::Null {
-            let key_idx = u32_index(self.layer.keys.insert_ref(key.as_ref()))?;
-            let value_idx = u32_index(self.layer.values.insert(value))?;
-            self.feature.tags.push(key_idx);
-            self.feature.tags.push(value_idx);
+        if value == MvtValue::Null {
+            return Ok(self);
         }
-        Ok(self)
+        let index = self.layer.values.insert_full(value).0;
+        self.tag_index(key.as_ref(), index)
     }
 
-    pub fn tag_string(
+    /// Add a borrowed value, cloning it only when it is new to this layer.
+    pub fn tag_ref(&mut self, key: impl AsRef<str>, value: &MvtValue) -> MvtResult<&mut Self> {
+        if *value == MvtValue::Null {
+            return Ok(self);
+        }
+        let index = self
+            .layer
+            .values
+            .get_index_of(value)
+            .unwrap_or_else(|| self.layer.values.insert_full(value.clone()).0);
+        self.tag_index(key.as_ref(), index)
+    }
+
+    /// Add a string, copying its contents only when it is new to this layer.
+    pub fn tag_string<'a>(
         &mut self,
         key: impl AsRef<str>,
-        value: impl Into<String>,
+        value: impl Into<Cow<'a, str>>,
     ) -> MvtResult<&mut Self> {
-        self.tag(key, MvtValue::String(value.into()))
+        let value = value.into();
+        let index = self
+            .layer
+            .values
+            .get_index_of(&StringValue(value.as_ref()))
+            .unwrap_or_else(|| {
+                self.layer
+                    .values
+                    .insert_full(MvtValue::String(value.into_owned()))
+                    .0
+            });
+        self.tag_index(key.as_ref(), index)
+    }
+
+    fn tag_index(&mut self, key: &str, index: usize) -> MvtResult<&mut Self> {
+        let key_idx = u32_index(self.layer.keys.insert_ref(key))?;
+        let value_idx = u32_index(index)?;
+        self.feature.tags.extend([key_idx, value_idx]);
+        Ok(self)
     }
 
     pub fn tag_float(&mut self, key: impl AsRef<str>, value: f32) -> MvtResult<&mut Self> {
@@ -294,9 +328,21 @@ impl MvtFeatureBuilder {
     }
 }
 
-// This is safe because all `MvtValue` variants contain only `PtrRead` values
-// (`String`, floats, integers, bools, or no payload).
-unsafe impl PtrRead for MvtValue {}
+// A borrowed string query with the same variant-sensitive hash as MvtValue.
+struct StringValue<'a>(&'a str);
+
+impl Hash for StringValue<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(&MvtValue::String(String::new())).hash(state);
+        self.0.hash(state);
+    }
+}
+
+impl Equivalent<MvtValue> for StringValue<'_> {
+    fn equivalent(&self, value: &MvtValue) -> bool {
+        matches!(value, MvtValue::String(string) if string == self.0)
+    }
+}
 
 fn value_to_proto(value: MvtValue) -> Value {
     match value {
@@ -342,6 +388,55 @@ mod tests {
             feature.feature.tags,
             vec![0, 0, 0, 1, 1, 0, 2, 2, 2, 3, 3, 4, 3, 4]
         );
+    }
+
+    #[test]
+    fn borrowed_tags_preserve_value_types_bits_and_insertion_order() {
+        let geometry = MvtGeometry::Point(point! { x: 1, y: 2 });
+        let mut owned = MvtLayerBuilder::new("values")
+            .unwrap()
+            .feature(&geometry)
+            .unwrap();
+        let mut borrowed = MvtLayerBuilder::new("values")
+            .unwrap()
+            .feature(&geometry)
+            .unwrap();
+        let values = [
+            MvtValue::String(String::new()),
+            MvtValue::String("road".into()),
+            MvtValue::String("Łódź".into()),
+            MvtValue::Int(1),
+            MvtValue::SInt(1),
+            MvtValue::UInt(1),
+            MvtValue::Bool(true),
+            MvtValue::Float(0.0),
+            MvtValue::Float(-0.0),
+            MvtValue::Float(f32::from_bits(0x7fc0_0001)),
+            MvtValue::Float(f32::from_bits(0x7fc0_0002)),
+            MvtValue::Double(0.0),
+            MvtValue::Double(-0.0),
+            MvtValue::Double(f64::from_bits(0x7ff8_0000_0000_0001)),
+            MvtValue::Double(f64::from_bits(0x7ff8_0000_0000_0002)),
+            MvtValue::Null,
+        ];
+        for value in &values {
+            owned.tag("key", value.clone()).unwrap();
+            match value {
+                MvtValue::String(string) => {
+                    borrowed.tag_string("key", string.as_str()).unwrap();
+                }
+                _ => {
+                    borrowed.tag_ref("key", value).unwrap();
+                }
+            }
+        }
+        // Query values inserted through both APIs, in a different order.
+        for value in values.iter().rev() {
+            owned.tag("second", value.clone()).unwrap();
+            borrowed.tag_ref("second", value).unwrap();
+        }
+        assert_eq!(borrowed.layer.values.len(), values.len() - 1);
+        assert_eq!(owned.end().encode(), borrowed.end().encode());
     }
 
     #[test]

@@ -70,7 +70,7 @@ fn create_tile() -> MvtResult<Vec<u8>> {
 
     let mut feature = layer.feature(&MvtGeometry::Point((1, 2).into()))?;
     feature.id(Some(7));
-    feature.tag("name", "Example")?;
+    feature.tag_string("name", "Example")?;
     feature.tag("visible", true)?;
 
     // `feature.end()` commits the feature and returns the layer;
@@ -78,6 +78,11 @@ fn create_tile() -> MvtResult<Vec<u8>> {
     Ok(feature.end().encode())
 }
 ```
+
+Use `tag_string()` for borrowed or owned strings and `tag_ref()` for borrowed
+`MvtValue` values. They look up existing layer values before copying string data.
+`tag()` accepts owned values, and `MvtTile::encode_ref()` uses borrowed lookups
+automatically.
 
 To add more layers, chain `MvtLayerBuilder::layer()`, which commits the current
 layer and opens the next one — without exposing the underlying tile builder:

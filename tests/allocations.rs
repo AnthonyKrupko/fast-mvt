@@ -4,7 +4,7 @@ use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 use std::hint::black_box;
 
-use fast_mvt::{MvtGeometry, MvtLayerBuilder, MvtReaderRef};
+use fast_mvt::{MvtGeometry, MvtLayerBuilder, MvtReaderRef, MvtValue};
 use geo_types::{LineString, MultiLineString, MultiPolygon, Polygon};
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -121,9 +121,7 @@ fn property_vectors_and_preallocated_tags_do_not_grow() {
         for _ in 1..20 {
             feature.tag("key", true).expect("valid tag");
         }
-        feature
-            .tag("ignored", fast_mvt::MvtValue::Null)
-            .expect("null tag");
+        feature.tag("ignored", MvtValue::Null).expect("null tag");
     });
     assert_eq!(counts.allocations, 0);
     assert_eq!(counts.reallocations, 0);
@@ -138,5 +136,38 @@ fn property_vectors_and_preallocated_tags_do_not_grow() {
     assert_eq!(counts.reallocations, 0);
     let (owned, counts) = measure(|| black_box(feature).to_feature().unwrap());
     assert_eq!(owned.properties.len(), 20);
+    assert_eq!(counts.reallocations, 0);
+}
+
+#[test]
+fn duplicate_string_tags_do_not_allocate() {
+    let mut feature = MvtLayerBuilder::new("test")
+        .unwrap()
+        .feature_with_capacity(&MvtGeometry::Point((1, 2).into()), 20)
+        .unwrap();
+    feature.tag_string("key", "road").unwrap();
+    let value = MvtValue::String("road".into());
+    let ((), counts) = measure(|| {
+        for _ in 0..5 {
+            feature
+                .tag_string("key", black_box("road"))
+                .expect("string tag");
+            feature
+                .tag_ref("key", black_box(&value))
+                .expect("borrowed tag");
+        }
+    });
+    assert_eq!(feature.num_tags(), 11);
+    assert_eq!(counts.allocations, 0);
+    assert_eq!(counts.reallocations, 0);
+
+    // A new owned string should also be moved into the table without a copy.
+    let owned = String::from("a different road");
+    let ((), counts) = measure(|| {
+        feature
+            .tag_string("key", black_box(owned))
+            .expect("owned string tag");
+    });
+    assert_eq!(counts.allocations, 0);
     assert_eq!(counts.reallocations, 0);
 }

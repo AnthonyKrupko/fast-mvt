@@ -45,7 +45,7 @@ required-features = ["reader", "writer"]
 [features]
 default = ["reader", "writer", "json"]
 reader = []
-writer = ["dep:dup-indexer"]
+writer = ["dep:dup-indexer", "dep:indexmap"]
 json = ["dep:serde", "dep:serde_json", "buffa/json"]
 codegen = ["dep:buffa-build"]
 arbitrary = ["dep:arbitrary", "buffa/arbitrary"]
@@ -57,6 +57,7 @@ buffa = "0.9.0"
 clap = { version = "4", features = ["derive"], optional = true }
 dup-indexer = { version = "0.5.0", optional = true }
 geo-types = "0.7.19"
+indexmap = { version = "2.14", optional = true }
 serde = { version = "1.0.228", features = ["derive"], optional = true }
 serde_json = { version = "1.0.150", optional = true }
 thiserror = "2.0.11"
