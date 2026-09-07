@@ -40,10 +40,11 @@ pub(crate) fn saturating_add_delta(value: i32, delta: u32) -> i32 {
 
 fn parse_points(data: &[u32]) -> MvtResult<MvtGeometry> {
     let mut cursor = Coord { x: 0, y: 0 };
+    let mut first = None;
     let mut points = Vec::new();
     let mut offset = 0;
     while offset < data.len() {
-        let (command, count) = Command::decode(data[offset])?;
+        let (command, mut count) = Command::decode(data[offset])?;
         if command != Command::MoveTo {
             return Err(MvtError::InvalidGeometry);
         }
@@ -52,17 +53,24 @@ fn parse_points(data: &[u32]) -> MvtResult<MvtGeometry> {
         if data.len() < offset + value_len {
             return Err(MvtError::InvalidGeometry);
         }
-        points.reserve(count);
+        if count > 0 && first.is_none() {
+            first = Some(Point(decode_coord(&mut cursor, &data[offset..offset + 2])?));
+            offset += 2;
+            count -= 1;
+        }
+        if count > 0 {
+            points.reserve(count + usize::from(points.is_empty()));
+            if points.is_empty() {
+                points.push(first.ok_or(MvtError::InvalidGeometry)?);
+            }
+        }
         for _ in 0..count {
             points.push(Point(decode_coord(&mut cursor, &data[offset..offset + 2])?));
             offset += 2;
         }
     }
     if points.is_empty() {
-        return Err(MvtError::InvalidGeometry);
-    }
-    if points.len() == 1 {
-        Ok(points.pop().ok_or(MvtError::InvalidGeometry)?.into())
+        Ok(first.ok_or(MvtError::InvalidGeometry)?.into())
     } else {
         Ok(MultiPoint(points).into())
     }
@@ -131,8 +139,14 @@ fn parse_line_slice(
 
 fn parse_linestrings(data: &[u32]) -> MvtResult<MvtGeometry> {
     let mut cursor = Coord { x: 0, y: 0 };
-    let mut offset = 0;
+    let info = line_info(data)?;
+    let first = parse_line_slice(&mut cursor, &data[..info.len], info, false)?;
+    let mut offset = info.len;
+    if offset == data.len() {
+        return Ok(first.into());
+    }
     let mut lines = Vec::new();
+    lines.push(first);
     while offset < data.len() {
         let info = line_info(&data[offset..])?;
         lines.push(parse_line_slice(
@@ -144,14 +158,7 @@ fn parse_linestrings(data: &[u32]) -> MvtResult<MvtGeometry> {
         let len = info.len;
         offset += len;
     }
-    if lines.is_empty() {
-        return Err(MvtError::InvalidGeometry);
-    }
-    if lines.len() == 1 {
-        Ok(lines.pop().ok_or(MvtError::InvalidGeometry)?.into())
-    } else {
-        Ok(MultiLineString(lines).into())
-    }
+    Ok(MultiLineString(lines).into())
 }
 
 fn ring_info(data: &[u32]) -> MvtResult<(LineInfo, usize)> {
@@ -196,15 +203,12 @@ fn parse_polygons(data: &[u32]) -> MvtResult<MvtGeometry> {
         }
         offset += len;
     }
-    if let Some(exterior) = current_exterior {
-        polygons.push(Polygon::new(exterior, current_interiors));
-    }
+    let exterior = current_exterior.ok_or(MvtError::InvalidGeometry)?;
+    let last = Polygon::new(exterior, current_interiors);
     if polygons.is_empty() {
-        return Err(MvtError::InvalidGeometry);
-    }
-    if polygons.len() == 1 {
-        Ok(polygons.pop().ok_or(MvtError::InvalidGeometry)?.into())
+        Ok(last.into())
     } else {
+        polygons.push(last);
         Ok(MultiPolygon(polygons).into())
     }
 }
@@ -214,6 +218,21 @@ mod tests {
     use geo_types::{Geometry, coord};
 
     use super::*;
+
+    #[test]
+    fn singleton_points_validate_the_entire_command_stream() {
+        for commands in [vec![9, 4, 6], vec![1, 9, 4, 6, 1]] {
+            assert_eq!(parse_points(&commands).unwrap(), Point::new(2, 3).into());
+        }
+        for commands in [vec![9, 4, 6, 10], vec![9, 4, 6, 9], vec![1, 1]] {
+            assert!(parse_points(&commands).is_err());
+        }
+        let commands = [1, 9, 4, 6, 1, 17, 2, 4, 2, 4, 1];
+        assert_eq!(
+            parse_points(&commands).unwrap(),
+            MultiPoint::from(vec![(2, 3), (3, 5), (4, 7)]).into()
+        );
+    }
 
     #[test]
     fn parses_move_only_lines_and_polygons() {

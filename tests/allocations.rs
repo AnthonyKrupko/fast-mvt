@@ -4,7 +4,7 @@ use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 use std::hint::black_box;
 
-use fast_mvt::{MvtGeometry, MvtLayerBuilder};
+use fast_mvt::{MvtGeometry, MvtLayerBuilder, MvtReaderRef};
 use geo_types::{LineString, MultiLineString, MultiPolygon, Polygon};
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -82,6 +82,29 @@ fn encoding_geometry_never_grows_its_command_buffer() {
         let layer = MvtLayerBuilder::new("test").unwrap();
         let (_, counts) = measure(|| layer.feature(black_box(&geometry)).unwrap());
         assert_eq!(counts.allocations, 1, "{geometry:?}");
+        assert_eq!(counts.reallocations, 0, "{geometry:?}");
+    }
+}
+
+#[test]
+fn decoding_single_geometries_only_allocates_their_coordinate_buffer() {
+    let line: LineString<i32> = vec![(0, 0), (10, 0), (10, 10)].into();
+    for (geometry, allocations) in [
+        (MvtGeometry::Point((1, 2).into()), 0),
+        (MvtGeometry::LineString(line.clone()), 1),
+        (MvtGeometry::Polygon(Polygon::new(line, vec![])), 1),
+    ] {
+        let bytes = MvtLayerBuilder::new("test")
+            .unwrap()
+            .feature(&geometry)
+            .unwrap()
+            .end()
+            .encode();
+        let reader = MvtReaderRef::new(&bytes).unwrap();
+        let feature = reader.layers().next().unwrap().features().next().unwrap();
+        let (decoded, counts) = measure(|| black_box(feature).geometry().unwrap());
+        assert_eq!(decoded, geometry);
+        assert_eq!(counts.allocations, allocations, "{geometry:?}");
         assert_eq!(counts.reallocations, 0, "{geometry:?}");
     }
 }
