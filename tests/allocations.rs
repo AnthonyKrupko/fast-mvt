@@ -108,3 +108,35 @@ fn decoding_single_geometries_only_allocates_their_coordinate_buffer() {
         assert_eq!(counts.reallocations, 0, "{geometry:?}");
     }
 }
+
+#[test]
+fn property_vectors_and_preallocated_tags_do_not_grow() {
+    let mut feature = MvtLayerBuilder::new("test")
+        .unwrap()
+        .feature_with_capacity(&MvtGeometry::Point((1, 2).into()), 20)
+        .unwrap();
+    // Seed the dictionaries before measuring growth of this feature's tags.
+    feature.tag("key", true).unwrap();
+    let ((), counts) = measure(|| {
+        for _ in 1..20 {
+            feature.tag("key", true).expect("valid tag");
+        }
+        feature
+            .tag("ignored", fast_mvt::MvtValue::Null)
+            .expect("null tag");
+    });
+    assert_eq!(counts.allocations, 0);
+    assert_eq!(counts.reallocations, 0);
+    assert_eq!(feature.num_tags(), 20);
+
+    let bytes = feature.end().encode();
+    let reader = MvtReaderRef::new(&bytes).unwrap();
+    let feature = reader.layers().next().unwrap().features().next().unwrap();
+    let (properties, counts) = measure(|| black_box(feature).properties_vec().unwrap());
+    assert_eq!(properties.len(), 20);
+    assert_eq!(counts.allocations, 1);
+    assert_eq!(counts.reallocations, 0);
+    let (owned, counts) = measure(|| black_box(feature).to_feature().unwrap());
+    assert_eq!(owned.properties.len(), 20);
+    assert_eq!(counts.reallocations, 0);
+}

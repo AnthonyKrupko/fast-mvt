@@ -61,7 +61,8 @@ pub(crate) fn encode_tile(tile: MvtTile) -> MvtResult<Vec<u8>> {
         let mut layer_bld = tile_bld.layer_with_capacity(layer.name, layer.features.len())?;
         layer_bld.extent(layer.extent);
         for feature in layer.features {
-            let mut feature_bld = layer_bld.feature(&feature.geometry)?;
+            let mut feature_bld =
+                layer_bld.feature_with_capacity(&feature.geometry, feature.properties.len())?;
             feature_bld.id(feature.id);
             for (key, value) in feature.properties {
                 feature_bld.tag(key, value)?;
@@ -80,7 +81,8 @@ pub(crate) fn encode_tile_ref(tile: &MvtTile) -> MvtResult<Vec<u8>> {
             tile_bld.layer_with_capacity(layer.name.clone(), layer.features.len())?;
         layer_bld.extent(layer.extent);
         for feature in &layer.features {
-            let mut feature_bld = layer_bld.feature(&feature.geometry)?;
+            let mut feature_bld =
+                layer_bld.feature_with_capacity(&feature.geometry, feature.properties.len())?;
             feature_bld.id(feature.id);
             for (key, value) in &feature.properties {
                 feature_bld.tag(key, value.clone())?;
@@ -152,12 +154,21 @@ impl MvtLayerBuilder {
     }
 
     pub fn feature(self, geometry: &MvtGeometry) -> MvtResult<MvtFeatureBuilder> {
+        self.feature_with_capacity(geometry, 0)
+    }
+
+    /// Start a feature with preallocated space for `tags` key-value pairs.
+    pub fn feature_with_capacity(
+        self,
+        geometry: &MvtGeometry,
+        tags: usize,
+    ) -> MvtResult<MvtFeatureBuilder> {
         let (geom_type, geometry) = encode_geometry(geometry)?;
         Ok(MvtFeatureBuilder {
             layer: self,
             feature: Feature {
                 id: None,
-                tags: Vec::new(),
+                tags: Vec::with_capacity(tags.saturating_mul(2)),
                 r#type: Some(geom_type),
                 geometry,
             },

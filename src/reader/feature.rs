@@ -62,7 +62,11 @@ impl<'a> MvtFeatureRef<'a> {
     }
 
     pub fn properties_vec(self) -> MvtResult<Vec<(&'a str, MvtValueRef<'a>)>> {
-        self.properties().collect()
+        let mut properties = Vec::with_capacity(self.tags().len() / 2);
+        for property in self.properties() {
+            properties.push(property?);
+        }
+        Ok(properties)
     }
 
     pub fn geometry(self) -> MvtResult<MvtGeometry> {
@@ -70,10 +74,11 @@ impl<'a> MvtFeatureRef<'a> {
     }
 
     pub fn to_feature(self) -> MvtResult<MvtFeature> {
-        let properties = self
-            .properties()
-            .map(|property| property.map(|(key, value)| (key.to_string(), value.into_owned())))
-            .collect::<MvtResult<Vec<_>>>()?;
+        let mut properties = Vec::with_capacity(self.tags().len() / 2);
+        for property in self.properties() {
+            let (key, value) = property?;
+            properties.push((key.to_string(), value.into_owned()));
+        }
         Ok(MvtFeature {
             id: self.id(),
             geometry: self.geometry()?,

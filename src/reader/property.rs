@@ -168,6 +168,17 @@ mod tests {
                 .unwrap()
                 .unwrap_err();
             assert_eq!(err.to_string(), expected);
+            assert_eq!(
+                first_feature(&reader)
+                    .properties_vec()
+                    .unwrap_err()
+                    .to_string(),
+                expected
+            );
+            assert_eq!(
+                first_feature(&reader).to_feature().unwrap_err().to_string(),
+                expected
+            );
         }
     }
 }
