@@ -62,14 +62,15 @@ impl<'a> MvtLayerRef<'a> {
             Some(extent) => NonZeroU32::new(extent).ok_or(MvtError::InvalidExtent)?,
             None => DEFAULT_EXTENT,
         };
-        self.features()
-            .map(MvtFeatureRef::to_feature)
-            .collect::<MvtResult<Vec<_>>>()
-            .map(|features| MvtLayer {
-                name: self.0.name.to_string(),
-                extent,
-                features,
-            })
+        let mut features = Vec::with_capacity(self.feature_count());
+        for feature in self.features() {
+            features.push(feature.to_feature()?);
+        }
+        Ok(MvtLayer {
+            name: self.0.name.to_string(),
+            extent,
+            features,
+        })
     }
 }
 

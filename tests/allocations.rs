@@ -171,3 +171,26 @@ fn duplicate_string_tags_do_not_allocate() {
     assert_eq!(counts.allocations, 0);
     assert_eq!(counts.reallocations, 0);
 }
+
+#[test]
+fn owned_layer_features_do_not_reallocate() {
+    for count in [0, 1, 5, 100] {
+        let mut layer = MvtLayerBuilder::with_capacity("test", count).unwrap();
+        for id in 0..count {
+            let mut feature = layer.feature(&MvtGeometry::Point((1, 2).into())).unwrap();
+            feature.id(Some(id as u64));
+            layer = feature.end();
+        }
+        let bytes = layer.encode();
+        let reader = MvtReaderRef::new(&bytes).unwrap();
+        let layer = reader.layers().next().unwrap();
+        let (owned, counts) = measure(|| black_box(layer).to_layer().unwrap());
+        assert_eq!(owned.features.len(), count);
+        assert_eq!(counts.reallocations, 0);
+        assert_eq!(counts.allocations, 1 + usize::from(count > 0));
+        for (id, feature) in owned.features.iter().enumerate() {
+            assert_eq!(feature.id, Some(id as u64));
+            assert_eq!(feature.geometry, MvtGeometry::Point((1, 2).into()));
+        }
+    }
+}
