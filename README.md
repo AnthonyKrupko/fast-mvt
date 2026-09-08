@@ -1,8 +1,7 @@
 # fast-mvt: performance fork
 
 This fork of [nyurik/fast-mvt](https://github.com/nyurik/fast-mvt) reduces allocation
-and copying in the Rust Mapbox Vector Tile reader and writer. The changes live on
-`feature/performance`.
+and copying in the Rust Mapbox Vector Tile reader and writer.
 
 The fork keeps the upstream integer geometry model and MVT wire format. Geometry
 uses [`geo-types`](https://docs.rs/geo-types/latest/geo_types/) with `i32` tile-space
@@ -44,21 +43,21 @@ See the [performance notes](docs/performance.md) for individual commits and test
 ## Installation
 
 Use the fork's Git source to get these changes. The package name remains `fast-mvt`;
-the crates.io package and upstream release binaries do not include this branch.
+the crates.io package and upstream release binaries do not include these changes.
 
 ```toml
 [dependencies]
-fast-mvt = { git = "https://github.com/AnthonyKrupko/fast-mvt", branch = "feature/performance" }
+fast-mvt = { git = "https://github.com/AnthonyKrupko/fast-mvt" }
 ```
 
-For reproducible builds, replace `branch` with an exact commit in `rev`. For a
+For reproducible builds, pin an exact commit with `rev`. For a
 reader-only dependency, set `default-features = false` and `features = ["reader"]`.
 
 Install the fork's CLI from source:
 
 ```bash
 cargo install fast-mvt --git https://github.com/AnthonyKrupko/fast-mvt \
-  --branch feature/performance --locked --features cli --bin mvt
+  --locked --features cli --bin mvt
 ```
 
 ## Decoding a tile

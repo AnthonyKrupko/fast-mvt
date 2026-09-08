@@ -1,1 +1,1 @@
-Performance fork of nyurik/fast-mvt: integer MVT read/write with fewer allocations. Apple M5 benchmarks vs 45a704a: +24% decode, +28% borrowed-encode throughput. See feature/performance.
+Performance fork of nyurik/fast-mvt: integer MVT read/write with fewer allocations. Apple M5 benchmarks vs 45a704a: +24% decode, +28% borrowed-encode throughput.
