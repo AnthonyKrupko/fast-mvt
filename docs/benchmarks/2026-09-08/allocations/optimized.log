@@ -1,0 +1,18 @@
+decode tiles=33 bytes=16163880
+encode tiles=30 bytes=898749
+stats decode: shapes_point_multipoint_line_multiline_polygon_multipolygon=[161924, 14, 11922, 1608, 11630, 285] string_occurrences=1423135 unique_strings_per_layer=209129 tags=2309728 features_with_more_than_2_tags=181067
+stats encode: shapes_point_multipoint_line_multiline_polygon_multipolygon=[534, 14, 3033, 1603, 6794, 283] string_occurrences=43202 unique_strings_per_layer=2851 tags=54185 features_with_more_than_2_tags=5945
+alloc reader_new: allocs=950 reallocs=36 requested_bytes=51710576
+alloc geometry_preparsed: allocs=52785 reallocs=943 requested_bytes=4409040
+alloc properties_preparsed: allocs=0 reallocs=0 requested_bytes=0
+alloc properties_vec_preparsed: allocs=187354 reallocs=0 requested_bytes=92389120
+alloc to_tile_preparsed: allocs=3973441 reallocs=943 requested_bytes=163247661
+alloc encode_ref: allocs=30940 reallocs=715 requested_bytes=5762367
+alloc clone_only: allocs=149085 reallocs=0 requested_bytes=6771399
+alloc proto_encode_original_tables: allocs=54 reallocs=169 requested_bytes=1107645
+alloc decode_point: allocs=0 reallocs=0 requested_bytes=0
+alloc encode_geometry_point: allocs=1 reallocs=0 requested_bytes=12
+alloc decode_line3: allocs=1 reallocs=0 requested_bytes=24
+alloc encode_geometry_line3: allocs=1 reallocs=0 requested_bytes=32
+alloc decode_polygon: allocs=1 reallocs=0 requested_bytes=40
+alloc encode_geometry_polygon: allocs=1 reallocs=0 requested_bytes=44

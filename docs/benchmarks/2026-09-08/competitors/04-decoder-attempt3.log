@@ -1,0 +1,10 @@
+Gnuplot not found, using plotters backend
+Benchmarking mvt selective decode/10 percent geometry
+Benchmarking mvt selective decode/10 percent geometry: Warming up for 3.0000 s
+Benchmarking mvt selective decode/10 percent geometry: Collecting 10 samples in estimated 10.810 s (385 iterations)
+Benchmarking mvt selective decode/10 percent geometry: Analyzing
+mvt selective decode/10 percent geometry
+                        time:   [28.080 ms 28.334 ms 28.664 ms]
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+

@@ -1,0 +1,11 @@
+Gnuplot not found, using plotters backend
+Benchmarking mvt decode/mvt-reader traverse (33 tiles)
+Benchmarking mvt decode/mvt-reader traverse (33 tiles): Warming up for 3.0000 s
+
+Warning: Unable to complete 10 samples in 10.0s. You may wish to increase target time to 11.0s or enable flat sampling.
+Benchmarking mvt decode/mvt-reader traverse (33 tiles): Collecting 10 samples in estimated 11.011 s (55 iterations)
+Benchmarking mvt decode/mvt-reader traverse (33 tiles): Analyzing
+mvt decode/mvt-reader traverse (33 tiles)
+                        time:   [195.24 ms 196.67 ms 197.37 ms]
+                        thrpt:  [78.103 MiB/s 78.381 MiB/s 78.954 MiB/s]
+

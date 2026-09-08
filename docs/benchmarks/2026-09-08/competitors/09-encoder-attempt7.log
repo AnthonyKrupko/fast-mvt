@@ -1,0 +1,12 @@
+Gnuplot not found, using plotters backend
+Benchmarking mvt encode/tinymvt owned encode (30 tiles)
+Benchmarking mvt encode/tinymvt owned encode (30 tiles): Warming up for 3.0000 s
+Benchmarking mvt encode/tinymvt owned encode (30 tiles): Collecting 10 samples in estimated 10.125 s (1265 iterations)
+Benchmarking mvt encode/tinymvt owned encode (30 tiles): Analyzing
+mvt encode/tinymvt owned encode (30 tiles)
+                        time:   [7.9159 ms 7.9309 ms 7.9453 ms]
+                        thrpt:  [107.88 MiB/s 108.07 MiB/s 108.28 MiB/s]
+Found 2 outliers among 10 measurements (20.00%)
+  1 (10.00%) low mild
+  1 (10.00%) high mild
+

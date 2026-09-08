@@ -1,0 +1,9 @@
+Gnuplot not found, using plotters backend
+Benchmarking mvt decode/fast-mvt traverse (33 tiles)
+Benchmarking mvt decode/fast-mvt traverse (33 tiles): Warming up for 3.0000 s
+Benchmarking mvt decode/fast-mvt traverse (33 tiles): Collecting 10 samples in estimated 11.010 s (330 iterations)
+Benchmarking mvt decode/fast-mvt traverse (33 tiles): Analyzing
+mvt decode/fast-mvt traverse (33 tiles)
+                        time:   [33.291 ms 33.334 ms 33.375 ms]
+                        thrpt:  [461.88 MiB/s 462.45 MiB/s 463.04 MiB/s]
+

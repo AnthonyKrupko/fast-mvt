@@ -1,0 +1,206 @@
+[
+  {
+    "case": "mvt decode/fast-mvt traverse (33 tiles)",
+    "version": "original",
+    "run": 0,
+    "log": "0-0-original-attempt1.log",
+    "ns": 41477533.13246753,
+    "mib_s": 371.6488432482533,
+    "estimate": {
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_bound": 41425961.06259823,
+        "upper_bound": 41508388.08965116
+      },
+      "point_estimate": 41477533.13246753,
+      "standard_error": 21153.977292566102
+    }
+  },
+  {
+    "case": "mvt decode/fast-mvt traverse (33 tiles)",
+    "version": "current",
+    "run": 1,
+    "log": "0-1-current-attempt1.log",
+    "ns": 33538091.1995671,
+    "mib_s": 459.6289370717565,
+    "estimate": {
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_bound": 33460572.20274914,
+        "upper_bound": 33599425.05967818
+      },
+      "point_estimate": 33538091.1995671,
+      "standard_error": 35399.502987137836
+    }
+  },
+  {
+    "case": "mvt decode/fast-mvt traverse (33 tiles)",
+    "version": "current",
+    "run": 2,
+    "log": "0-2-current-attempt1.log",
+    "ns": 33333582.717748918,
+    "mib_s": 462.4488564580455,
+    "estimate": {
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_bound": 33291281.132820513,
+        "upper_bound": 33374826.576935686
+      },
+      "point_estimate": 33333582.717748918,
+      "standard_error": 21901.238865790576
+    }
+  },
+  {
+    "case": "mvt decode/fast-mvt traverse (33 tiles)",
+    "version": "original",
+    "run": 3,
+    "log": "0-3-original-attempt1.log",
+    "ns": 41239738.38181818,
+    "mib_s": 373.79182832713775,
+    "estimate": {
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_bound": 41116978.99067602,
+        "upper_bound": 41323556.95894737
+      },
+      "point_estimate": 41239738.38181818,
+      "standard_error": 52076.53074637726
+    }
+  },
+  {
+    "case": "mvt encode/fast-mvt encode (30 tiles)",
+    "version": "original",
+    "run": 0,
+    "log": "1-0-original-attempt1.log",
+    "ns": 5174644.362987013,
+    "mib_s": 165.63724539729338,
+    "estimate": {
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_bound": 5165476.229822404,
+        "upper_bound": 5190418.291318365
+      },
+      "point_estimate": 5174644.362987013,
+      "standard_error": 6357.442117900117
+    }
+  },
+  {
+    "case": "mvt encode/fast-mvt encode (30 tiles)",
+    "version": "current",
+    "run": 1,
+    "log": "1-1-current-attempt1.log",
+    "ns": 4078052.002886003,
+    "mib_s": 210.17727032152325,
+    "estimate": {
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_bound": 4058560.7450241544,
+        "upper_bound": 4088390.4392328537
+      },
+      "point_estimate": 4078052.002886003,
+      "standard_error": 7694.455757548571
+    }
+  },
+  {
+    "case": "mvt encode/fast-mvt encode (30 tiles)",
+    "version": "current",
+    "run": 2,
+    "log": "1-2-current-attempt1.log",
+    "ns": 4039983.7566522365,
+    "mib_s": 212.15774365044842,
+    "estimate": {
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_bound": 4033212.9418470417,
+        "upper_bound": 4050764.493054109
+      },
+      "point_estimate": 4039983.7566522365,
+      "standard_error": 4458.329335361852
+    }
+  },
+  {
+    "case": "mvt encode/fast-mvt encode (30 tiles)",
+    "version": "original",
+    "run": 3,
+    "log": "1-3-original-attempt1.log",
+    "ns": 5223362.76148423,
+    "mib_s": 164.09234382799215,
+    "estimate": {
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_bound": 5181787.324192391,
+        "upper_bound": 5264615.301373644
+      },
+      "point_estimate": 5223362.76148423,
+      "standard_error": 21544.588291112916
+    }
+  },
+  {
+    "case": "mvt encode/fast-mvt owned encode (30 tiles)",
+    "version": "original",
+    "run": 0,
+    "log": "2-0-original-attempt1.log",
+    "ns": 7315329.891428571,
+    "mib_s": 117.16680599737377,
+    "estimate": {
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_bound": 7284091.142476191,
+        "upper_bound": 7332432.1235029055
+      },
+      "point_estimate": 7315329.891428571,
+      "standard_error": 12086.07309209484
+    }
+  },
+  {
+    "case": "mvt encode/fast-mvt owned encode (30 tiles)",
+    "version": "current",
+    "run": 1,
+    "log": "2-1-current-attempt1.log",
+    "ns": 6666105.573654916,
+    "mib_s": 128.5778973533207,
+    "estimate": {
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_bound": 6643289.657200634,
+        "upper_bound": 6705920.958250261
+      },
+      "point_estimate": 6666105.573654916,
+      "standard_error": 15935.619478369645
+    }
+  },
+  {
+    "case": "mvt encode/fast-mvt owned encode (30 tiles)",
+    "version": "current",
+    "run": 2,
+    "log": "2-2-current-attempt1.log",
+    "ns": 6737084.115728715,
+    "mib_s": 127.2232650613256,
+    "estimate": {
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_bound": 6704914.974329828,
+        "upper_bound": 6770866.221307252
+      },
+      "point_estimate": 6737084.115728715,
+      "standard_error": 16906.741180215107
+    }
+  },
+  {
+    "case": "mvt encode/fast-mvt owned encode (30 tiles)",
+    "version": "original",
+    "run": 3,
+    "log": "2-3-original-attempt1.log",
+    "ns": 7295119.441558441,
+    "mib_s": 117.49140573532506,
+    "estimate": {
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_bound": 7281198.046180758,
+        "upper_bound": 7309810.511452371
+      },
+      "point_estimate": 7295119.441558441,
+      "standard_error": 7253.343632042384
+    }
+  }
+]

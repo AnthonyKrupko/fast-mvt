@@ -1,0 +1,157 @@
+[
+  {
+    "name": "mvt decode/fast-mvt traverse (33 tiles)",
+    "binary": "decoder",
+    "log": "00-decoder-attempt2.log",
+    "time_ms": 33.59,
+    "time_95_ci_ms": [
+      33.007,
+      34.368
+    ],
+    "throughput_mib_s": 458.92,
+    "throughput_95_ci_mib_s": [
+      448.53,
+      467.02
+    ]
+  },
+  {
+    "name": "mvt decode/mvt-reader traverse (33 tiles)",
+    "binary": "decoder",
+    "log": "01-decoder-attempt1.log",
+    "time_ms": 196.67,
+    "time_95_ci_ms": [
+      195.24,
+      197.37
+    ],
+    "throughput_mib_s": 78.381,
+    "throughput_95_ci_mib_s": [
+      78.103,
+      78.954
+    ]
+  },
+  {
+    "name": "mvt decode/tinymvt traverse (33 tiles)",
+    "binary": "decoder",
+    "log": "02-decoder-attempt19.log",
+    "time_ms": 91.993,
+    "time_95_ci_ms": [
+      91.16,
+      92.89
+    ],
+    "throughput_mib_s": 167.57,
+    "throughput_95_ci_mib_s": [
+      165.95,
+      169.1
+    ]
+  },
+  {
+    "name": "mvt selective decode/properties only",
+    "binary": "decoder",
+    "log": "03-decoder-attempt3.log",
+    "time_ms": 27.213,
+    "time_95_ci_ms": [
+      27.156,
+      27.27
+    ]
+  },
+  {
+    "name": "mvt selective decode/10 percent geometry",
+    "binary": "decoder",
+    "log": "04-decoder-attempt3.log",
+    "time_ms": 28.334,
+    "time_95_ci_ms": [
+      28.08,
+      28.664
+    ]
+  },
+  {
+    "name": "mvt encode/fast-mvt owned encode (30 tiles)",
+    "binary": "encoder",
+    "log": "05-encoder-attempt1.log",
+    "time_ms": 6.7147,
+    "time_95_ci_ms": [
+      6.7066,
+      6.7274
+    ],
+    "throughput_mib_s": 127.65,
+    "throughput_95_ci_mib_s": [
+      127.41,
+      127.8
+    ]
+  },
+  {
+    "name": "mvt encode/fast-mvt encode (30 tiles)",
+    "binary": "encoder",
+    "log": "06-encoder-attempt1.log",
+    "time_ms": 4.0891,
+    "time_95_ci_ms": [
+      4.0808,
+      4.0975
+    ],
+    "throughput_mib_s": 209.61,
+    "throughput_95_ci_mib_s": [
+      209.18,
+      210.04
+    ]
+  },
+  {
+    "name": "mvt encode/mvt owned encode (30 tiles)",
+    "binary": "encoder",
+    "log": "07-encoder-attempt2.log",
+    "time_ms": 10.846,
+    "time_95_ci_ms": [
+      10.759,
+      10.951
+    ],
+    "throughput_mib_s": 79.023,
+    "throughput_95_ci_mib_s": [
+      78.268,
+      79.663
+    ]
+  },
+  {
+    "name": "mvt encode/mvt encode (30 tiles)",
+    "binary": "encoder",
+    "log": "08-encoder-attempt9.log",
+    "time_ms": 8.2385,
+    "time_95_ci_ms": [
+      8.1428,
+      8.2849
+    ],
+    "throughput_mib_s": 104.04,
+    "throughput_95_ci_mib_s": [
+      103.45,
+      105.26
+    ]
+  },
+  {
+    "name": "mvt encode/tinymvt owned encode (30 tiles)",
+    "binary": "encoder",
+    "log": "09-encoder-attempt7.log",
+    "time_ms": 7.9309,
+    "time_95_ci_ms": [
+      7.9159,
+      7.9453
+    ],
+    "throughput_mib_s": 108.07,
+    "throughput_95_ci_mib_s": [
+      107.88,
+      108.28
+    ]
+  },
+  {
+    "name": "mvt encode/tinymvt encode (30 tiles)",
+    "binary": "encoder",
+    "log": "10-encoder-attempt15.log",
+    "time_ms": 5.1861,
+    "time_95_ci_ms": [
+      5.1681,
+      5.1961
+    ],
+    "throughput_mib_s": 165.27,
+    "throughput_95_ci_mib_s": [
+      164.95,
+      165.85
+    ]
+  }
+]

@@ -1,9 +1,9 @@
 [package]
 name = "fast-mvt"
 version = "0.6.2"
-description = "Fast Mapbox Vector Tile (MVT) reader and writer"
+description = "Performance fork of fast-mvt: an integer Mapbox Vector Tile reader and writer with fewer allocations"
 authors = ["Yuri Astrakhan <YuriAstrakhan@gmail.com>"]
-repository = "https://github.com/nyurik/fast-mvt"
+repository = "https://github.com/AnthonyKrupko/fast-mvt"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 keywords = ["tile", "mvt", "map"]

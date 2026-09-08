@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Performance fork
+
+- Borrow encoded geometry commands and decode coordinates directly on demand.
+- Compact property dictionaries, share feature tags per layer, and preallocate reader storage.
+- Remove singleton geometry temporary vectors and reserve owned feature/property output.
+- Reserve encoder buffers and deduplicate borrowed values before cloning strings.
+- Record direct upstream/fork and competitor benchmarks in `docs/performance.md`.
+
+### Breaking changes
+
+- `geometry_commands()` now returns `MvtGeometryCommands`, an iterator, instead of a slice.
+- `tag_string()` now accepts `Into<Cow<str>>` rather than `Into<String>`.
+- Structural sizing can change which error is reported first for multiply malformed input.
+
 ## [0.6.2](https://github.com/nyurik/fast-mvt/compare/v0.6.1...v0.6.2) - 2026-07-20
 
 ### Other

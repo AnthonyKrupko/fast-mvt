@@ -1,0 +1,11 @@
+Gnuplot not found, using plotters backend
+Benchmarking mvt encode/fast-mvt encode (30 tiles)
+Benchmarking mvt encode/fast-mvt encode (30 tiles): Warming up for 3.0000 s
+Benchmarking mvt encode/fast-mvt encode (30 tiles): Collecting 10 samples in estimated 10.133 s (2475 iterations)
+Benchmarking mvt encode/fast-mvt encode (30 tiles): Analyzing
+mvt encode/fast-mvt encode (30 tiles)
+                        time:   [4.0808 ms 4.0891 ms 4.0975 ms]
+                        thrpt:  [209.18 MiB/s 209.61 MiB/s 210.04 MiB/s]
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+

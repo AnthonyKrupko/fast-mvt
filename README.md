@@ -1,31 +1,64 @@
-# fast-mvt
+# fast-mvt: performance fork
 
-[![GitHub repo](https://img.shields.io/badge/github-nyurik/fast--mvt-8da0cb?logo=github)](https://github.com/nyurik/fast-mvt)
-[![crates.io version](https://img.shields.io/crates/v/fast-mvt)](https://crates.io/crates/fast-mvt)
-[![crate usage](https://img.shields.io/crates/d/fast-mvt)](https://crates.io/crates/fast-mvt)
-[![docs.rs status](https://img.shields.io/docsrs/fast-mvt)](https://docs.rs/fast-mvt)
-[![crates.io license](https://img.shields.io/crates/l/fast-mvt)](https://github.com/nyurik/fast-mvt/blob/main/LICENSE-APACHE)
-[![CI build status](https://github.com/nyurik/fast-mvt/actions/workflows/ci.yml/badge.svg)](https://github.com/nyurik/fast-mvt/actions)
-[![Codecov](https://img.shields.io/codecov/c/github/nyurik/fast-mvt)](https://app.codecov.io/gh/nyurik/fast-mvt)
+This fork of [nyurik/fast-mvt](https://github.com/nyurik/fast-mvt) reduces allocation
+and copying in the Rust Mapbox Vector Tile reader and writer. The changes live on
+`feature/performance`.
 
-`fast-mvt` is an integer-only Mapbox Vector Tile reader and writer for Rust.
-Geometry uses [`geo-types`](https://docs.rs/geo-types/latest/geo_types/) with `i32` coordinates. The crate does not project,
-scale, round, or handle floating point geometry coordinates; callers provide and
-receive tile-space integers. See [`geo`](https://docs.rs/geo/latest/geo/) for the geometry manipulations you may need.
+The fork keeps the upstream integer geometry model and MVT wire format. Geometry
+uses [`geo-types`](https://docs.rs/geo-types/latest/geo_types/) with `i32` tile-space
+coordinates. Callers provide projected integer coordinates; this crate does not
+project, scale, or round geographic coordinates.
+
+Against upstream commit [`45a704a`](https://github.com/nyurik/fast-mvt/commit/45a704af5f63080110401fe146db40903b56fc25),
+the optimized code at [`5afb822`](https://github.com/AnthonyKrupko/fast-mvt/commit/5afb8224c76b7304c1cb43257c32f59be66e87f5)
+measured 24% higher decode throughput and 28% higher borrowed-encode throughput on
+an Apple M5. Reader construction used 99.7% fewer allocations.
+The [benchmarks](#benchmarks) below include the workloads and raw results.
+
+## Differences from upstream
+
+| Area | Changes in this fork |
+|---|---|
+| Geometry commands | Borrow command bytes from the input. Decode coordinates when requested. |
+| Property dictionaries | Decode each value once into compact storage. Keep the original bytes for `to_proto()`. |
+| Feature tags | Store tags in one buffer per layer. Each feature's `tags()` returns a slice of that buffer. |
+| Reader storage | Count fields before decoding a layer to reserve space for features, dictionaries, and tags. |
+| Geometry and owned output | Reserve output space, including polygon ring closure, and remove temporary vectors for singleton geometries. |
+| Encoding | Reserve command and tag buffers. Check for duplicate values before copying strings. |
+
+See the [performance notes](docs/performance.md) for individual commits and tests.
+
+### Rust API and behavior differences
+
+- `geometry_commands()` returns a cloneable `MvtGeometryCommands` iterator with
+  `Item = u32`, replacing the upstream `&[u32]`. Use `.len()` for its count and
+  `.collect::<Vec<u32>>()` when an owned command buffer is required.
+- `tag_ref()` accepts borrowed values; `feature_with_capacity()` reserves tag pairs.
+  `tag_string()` accepts `Into<Cow<str>>`. Custom types that only implement
+  `Into<String>` need an explicit conversion before calling it.
+- Reader construction still validates protobuf wire data. Its structural sizing
+  pass can report a different first error for a message containing several faults.
+- `to_proto()` decodes compacted value messages again from their original bytes.
+  This extra work can make owned protobuf conversion slower.
 
 ## Installation
 
-Install the `mvt` CLI from prebuilt release binaries with
-[cargo-binstall](https://github.com/cargo-bins/cargo-binstall):
+Use the fork's Git source to get these changes. The package name remains `fast-mvt`;
+the crates.io package and upstream release binaries do not include this branch.
 
-```bash
-cargo binstall fast-mvt
+```toml
+[dependencies]
+fast-mvt = { git = "https://github.com/AnthonyKrupko/fast-mvt", branch = "feature/performance" }
 ```
 
-You can also build it from source:
+For reproducible builds, replace `branch` with an exact commit in `rev`. For a
+reader-only dependency, set `default-features = false` and `features = ["reader"]`.
+
+Install the fork's CLI from source:
 
 ```bash
-cargo install fast-mvt --features cli --bin mvt
+cargo install fast-mvt --git https://github.com/AnthonyKrupko/fast-mvt \
+  --branch feature/performance --locked --features cli --bin mvt
 ```
 
 ## Decoding a tile
@@ -54,22 +87,15 @@ fn read_tile(bytes: &[u8]) -> MvtResult<()> {
 }
 ```
 
-The reader validates protobuf wire data when it is created and borrows geometry
-commands from the input bytes. Reading IDs and properties does not allocate
-geometry command buffers. `feature.geometry()` decodes directly into coordinates;
-it does not cache the result, so retain the returned geometry if you need it again.
-
-`feature.geometry_commands()` returns a cloneable `ExactSizeIterator<Item = u32>`.
-Use `.len()` to inspect the command count without decoding it, iterate to inspect
-individual commands, or `.collect::<Vec<u32>>()` to obtain an owned buffer.
+Reading IDs and properties does not allocate geometry command buffers.
+`feature.geometry()` decodes coordinates each time you call it.
+Keep the returned geometry if you need it again. Use `feature.geometry_commands()`
+to inspect the commands without building coordinates.
 
 ## Encoding a tile
 
-The simplest path starts a layer with `MvtLayerBuilder::new()`, adds features and
-their tags, and produces the tile bytes with `MvtLayerBuilder::encode()`. The
-builder is a consuming chain — each step returns the next builder and `end()`
-returns the parent — so a half-built layer or feature can never be used by
-accident.
+Start with `MvtLayerBuilder::new()`, add a feature and its tags, then encode the
+layer. `feature.end()` adds the feature to the layer and returns the layer builder.
 
 ```rust
 use fast_mvt::{MvtGeometry, MvtLayerBuilder, MvtResult};
@@ -82,19 +108,16 @@ fn create_tile() -> MvtResult<Vec<u8>> {
     feature.tag_string("name", "Example")?;
     feature.tag("visible", true)?;
 
-    // `feature.end()` commits the feature and returns the layer;
-    // `layer.encode()` produces the final tile bytes.
     Ok(feature.end().encode())
 }
 ```
 
 Use `tag_string()` for borrowed or owned strings and `tag_ref()` for borrowed
 `MvtValue` values. They look up existing layer values before copying string data.
-`tag()` accepts owned values, and `MvtTile::encode_ref()` uses borrowed lookups
-automatically.
+`tag()` accepts owned values. `MvtTile::encode_ref()` also checks for duplicates
+before copying strings.
 
-To add more layers, chain `MvtLayerBuilder::layer()`, which commits the current
-layer and opens the next one — without exposing the underlying tile builder:
+To add another layer, call `.layer()` on the current layer builder:
 
 ```rust
 use fast_mvt::{MvtGeometry, MvtLayerBuilder, MvtResult};
@@ -112,11 +135,9 @@ fn create_tile() -> MvtResult<Vec<u8>> {
 }
 ```
 
-`MvtTileBuilder` is the underlying root, useful when you want a tile-first
-structure or need to preallocate. It nests tile → layer → feature and unwinds in
-reverse: `feature.end()` returns the layer, `layer.end()` returns the tile, then
-`tile.encode()` produces the bytes. The `with_capacity` constructors preallocate
-for a known number of layers or features:
+Use `MvtTileBuilder` to reserve space for a known number of layers and features.
+With this builder, `feature.end()` returns the layer and `layer.end()` returns
+the tile:
 
 ```rust
 use fast_mvt::{MvtGeometry, MvtResult, MvtTileBuilder};
@@ -136,12 +157,12 @@ fn write_tile() -> MvtResult<Vec<u8>> {
 
 ## Parallel encoding
 
-Key and value deduplication is scoped to a single layer, so layers can be built
-completely independently. Each `MvtLayerBuilder::encode()` output is a framed
-layer chunk, and concatenating those chunks — in whatever order you want the
-layers — forms a complete tile. Per-layer parallelism is therefore
-straightforward: encode each layer on its own thread, then concatenate the
-buffers.
+Each layer has its own key and value dictionaries, so separate threads can encode
+layers independently. Concatenate their `MvtLayerBuilder::encode()` outputs in the
+desired layer order to form a tile.
+
+This example uses a serial iterator. With Rayon and its parallel iterator traits
+in scope, replace `.iter()` with `.par_iter()` to encode layers in parallel.
 
 ```rust
 use fast_mvt::{MvtGeometry, MvtLayerBuilder, MvtResult};
@@ -153,52 +174,68 @@ fn encode_layer(name: &str, geometry: &MvtGeometry) -> MvtResult<Vec<u8>> {
 
 fn encode_tile(layers: &[(&str, MvtGeometry)]) -> MvtResult<Vec<u8>> {
     let buffers: Vec<Vec<u8>> = layers
-        // This code is single-threaded, but it is easy to parallelize
-        // with the `rayon` crate: swap `.iter()` for `.par_iter()` to encode
-        // the layers in parallel.
         .iter()
         .map(|(name, geometry)| encode_layer(name, geometry))
         .collect::<MvtResult<_>>()?;
 
-    // Concatenate the framed layer buffers, in order, into a tile.
     Ok(buffers.concat())
 }
 ```
 
 ## Benchmarks
 
-#### Decoding
+### Original upstream versus this fork
 
-Run with `just bench-decode`:
+Criterion compared upstream `45a704a` with fork `5afb822`, which includes all nine
+optimization commits. Both ran on the same Apple M5 with the same compiler,
+dependencies, fixtures, and benchmark settings.
 
-| Decoder                         | Time     | Throughput  | Compare     |
-|---------------------------------|----------|-------------|-------------|
-| `fast-mvt`                      | 97.6 ms  | 157.9 MiB/s | -           |
-| `tinymvt 0.3.0`                 | 192.3 ms | 80.2 MiB/s  | 2.0x slower |
-| `mvt-reader 2.3.0`              | 597.0 ms | 25.8 MiB/s  | 6.1x slower |
-| `mvt` <br/>decode not supported | n/a      | n/a         | n/a         |
+| Workload | Original time | Fork time | Original throughput | Fork throughput | Throughput gain |
+|---|---:|---:|---:|---:|---:|
+| Full decode | 41.359 ms | 33.436 ms | 372.72 MiB/s | 461.03 MiB/s | +23.7% |
+| Borrowed encode | 5.199 ms | 4.059 ms | 164.86 MiB/s | 211.16 MiB/s | +28.1% |
+| Clone + consuming encode | 7.305 ms | 6.702 ms | 117.33 MiB/s | 127.90 MiB/s | +9.0% |
 
-#### Encoding
+Decode covers 33 real-world tiles, totaling 16,163,880 encoded bytes. Encode covers
+30 tiles, totaling 898,749 original encoded bytes. Times are per complete corpus,
+not per tile. The consuming benchmark includes a deep clone of its prepared input.
 
-Run with `just bench-encode`:
+Reader construction uses 950 allocations instead of 375,465. Combining reader
+construction and geometry output, full traversal uses 91.2% fewer allocations and
+requests 72.9% fewer bytes from the allocator. These counts measure allocation
+traffic, not peak memory or resident memory.
 
-Encoding from an already parsed integer tile model:
+### Other libraries
 
-| Encoder                                | Time    | Throughput | Compare     |
-|----------------------------------------|---------|------------|-------------|
-| `fast-mvt`                             | 12.9 ms | 66.5 MiB/s | -           |
-| `tinymvt 0.3.0`                        | 14.1 ms | 60.9 MiB/s | 1.1x slower |
-| `mvt 0.14.0`                           | 23.4 ms | 36.7 MiB/s | 1.8x slower |
-| `mvt-reader` <br/>encode not supported | n/a     | n/a        | n/a         |
+A separate Criterion run on the same machine compared the locked dependency
+versions. Compare throughput within each column; decoding and encoding use
+different corpora, and the consuming path includes input cloning.
 
-Encoding from an owned tile value. Note that "owned" benchmark includes deep-cloning of each tile, so it makes no sense to compare throughput between the owned vs referenced table above, only between different encoders. Owned path is usually better.
+| Library | Full decode | Borrowed encode | Clone + consuming encode |
+|---|---:|---:|---:|
+| This fork, `5afb822` | 458.92 MiB/s | 209.61 MiB/s | 127.65 MiB/s |
+| `tinymvt 0.3.0` | 167.57 MiB/s | 165.27 MiB/s | 108.07 MiB/s |
+| `mvt-reader 2.4.0` | 78.38 MiB/s | Not supported | Not supported |
+| `mvt 0.15.0` | Not supported | 104.04 MiB/s | 79.02 MiB/s |
 
-| Encoder                                | Time    | Throughput | Compare     |
-|----------------------------------------|---------|------------|-------------|
-| `fast-mvt`                             | 18.6 ms | 46.0 MiB/s | -           |
-| `tinymvt 0.3.0`                        | 23.1 ms | 37.1 MiB/s | 1.2x slower |
-| `mvt 0.14.0`                           | 32.9 ms | 26.1 MiB/s | 1.8x slower |
-| `mvt-reader` <br/>encode not supported | n/a     | n/a        | n/a         |
+### Running the benchmarks
+
+```bash
+just bench-decode
+just bench-encode
+```
+
+The benches use 10 samples, a 3-second warm-up, and a 10-second measurement target.
+The direct comparison ran original/fork/fork/original for each workload. Runs with
+competing compiler or Meridian processes were discarded and repeated.
+
+Fewer allocations leave more time for parsing and geometry work, but a 99.7% drop
+in allocations does not mean a 99.7% drop in runtime. These benchmarks measure
+single-threaded crate throughput. They do not measure parallel scaling or
+Meridian's tile pipeline, and results will vary with the tile set and machine.
+
+See [methods, allocation results, and raw benchmark data](docs/performance.md) for
+the full comparison.
 
 ## Features
 
@@ -215,14 +252,13 @@ The generated protobuf files are checked in, so normal builds do not require
 
 ## Development
 
-* This project is easier to develop with [just](https://github.com/casey/just#readme), a modern alternative to `make`.
-  Install it with `cargo install just`.
-* To get a list of available commands, run `just`.
-* To run tests, use `just test`.
+Install [just](https://github.com/casey/just#readme) with `cargo install just`.
+Run `just` to list commands or `just test` to run the tests.
 
 ## Credits
 
-The code was inspired by several open source MVT implementations:
+This fork builds on Yuri Astrakhan's [fast-mvt](https://github.com/nyurik/fast-mvt).
+Upstream credits these projects for encoding, decoding, and tests:
 
 - Encoding and testing from `mvt` crate by the Minnesota Department of Transportation.
 - Decoding and testing from `mvt-reader` by Paul Lange.
