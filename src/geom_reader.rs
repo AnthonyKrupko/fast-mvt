@@ -110,10 +110,10 @@ fn parse_line_slice(
     cursor: &mut MvtCoord,
     data: &[u32],
     info: LineInfo,
-    reserve_closure: bool,
+    extra_capacity: usize,
 ) -> MvtResult<MvtLineString> {
     let (_, move_count) = Command::decode(data[0])?;
-    let mut coords = Vec::with_capacity(info.coord_count + usize::from(reserve_closure));
+    let mut coords = Vec::with_capacity(info.coord_count + extra_capacity);
     for move_idx in 0..move_count {
         let offset = 1 + move_idx * 2;
         coords.push(decode_coord(cursor, &data[offset..offset + 2])?);
@@ -139,7 +139,7 @@ fn parse_linestrings(data: &[u32]) -> MvtResult<MvtGeometry> {
             &mut cursor,
             &data[offset..offset + info.len],
             info,
-            false,
+            0,
         )?);
         let len = info.len;
         offset += len;
@@ -169,7 +169,8 @@ fn ring_info(data: &[u32]) -> MvtResult<(LineInfo, usize)> {
 
 fn parse_ring(cursor: &mut MvtCoord, data: &[u32]) -> MvtResult<(MvtLineString, i64, usize)> {
     let (info, len) = ring_info(data)?;
-    let mut ring = parse_line_slice(cursor, &data[..info.len], info, true)?;
+    // One spare slot, for the closing coordinate pushed below
+    let mut ring = parse_line_slice(cursor, &data[..info.len], info, 1)?;
     let area = signed_area(&ring.0);
     let first = *ring.0.first().ok_or(MvtError::InvalidGeometry)?;
     ring.0.push(first);
@@ -242,7 +243,7 @@ mod tests {
         let mut cursor = coord! { x: 0, y: 0 };
         let info = line_info(&[9, 0, 0, 15]).unwrap();
         assert!(matches!(
-            parse_line_slice(&mut cursor, &[9, 0, 0, 15], info, false),
+            parse_line_slice(&mut cursor, &[9, 0, 0, 15], info, 0),
             Err(MvtError::InvalidGeometry)
         ));
 
@@ -328,7 +329,7 @@ mod tests {
     fn line_capacity_does_not_include_a_closure_slot() {
         let commands = [9, 0, 0, 18, 20, 0, 0, 20];
         let info = line_info(&commands).unwrap();
-        let line = parse_line_slice(&mut MvtCoord::zero(), &commands, info, false).unwrap();
+        let line = parse_line_slice(&mut MvtCoord::zero(), &commands, info, 0).unwrap();
         assert_eq!(line.0.len(), 3);
         assert_eq!(line.0.capacity(), 3);
     }
