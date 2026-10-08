@@ -81,10 +81,9 @@ mod tests {
     use geo_types::Geometry;
 
     use super::*;
-    use crate::MvtValue;
-    use crate::MvtValueRef;
     use crate::generated::vector_tile::tile as proto_tile;
     use crate::reader::tests::{encode_feature, encode_layer, first_feature};
+    use crate::{MvtValue, MvtValueRef};
 
     #[test]
     fn borrowed_api_reads_accessors_properties_and_repeated_points() {

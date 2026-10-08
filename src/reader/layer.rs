@@ -3,9 +3,8 @@ use std::num::NonZeroU32;
 
 use super::feature::MvtFeatureRef;
 use super::property::value_ref;
-use crate::MvtValueRef;
 use crate::generated::vector_tile::tile as proto_tile;
-use crate::{DEFAULT_EXTENT, MvtError, MvtLayer, MvtResult};
+use crate::{DEFAULT_EXTENT, MvtError, MvtLayer, MvtResult, MvtValueRef};
 
 #[derive(Copy, Clone)]
 pub struct MvtLayerRef<'a>(&'a proto_tile::LayerView<'a>);

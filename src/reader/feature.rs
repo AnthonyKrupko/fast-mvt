@@ -4,10 +4,9 @@ use buffa::Enumeration as _;
 use geo_types::{Coord, Geometry, LineString, Point, Polygon};
 
 use super::property::MvtPropertyIter;
-use crate::MvtValueRef;
 use crate::generated::vector_tile::tile as proto_tile;
 use crate::geom_reader::decode_geometry;
-use crate::{MvtFeature, MvtGeometry, MvtResult};
+use crate::{MvtFeature, MvtGeometry, MvtResult, MvtValueRef};
 
 #[derive(Copy, Clone)]
 pub struct MvtFeatureRef<'a> {
