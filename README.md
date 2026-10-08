@@ -185,9 +185,9 @@ Run with `just bench-decode`:
 
 | Decoder                         | Time     | Throughput  | Compare     |
 |---------------------------------|----------|-------------|-------------|
-| `fast-mvt`                      | 102.5 ms | 150.3 MiB/s | -           |
-| `tinymvt 0.3.0`                 | 197.0 ms | 78.3 MiB/s  | 1.9x slower |
-| `mvt-reader 2.3.0`              | 609.2 ms | 25.3 MiB/s  | 5.9x slower |
+| `fast-mvt`                      | 98.4 ms  | 156.6 MiB/s | -           |
+| `tinymvt 0.3.0`                 | 192.0 ms | 80.3 MiB/s  | 2.0x slower |
+| `mvt-reader 2.3.0`              | 600.2 ms | 25.7 MiB/s  | 6.1x slower |
 | `mvt` <br/>decode not supported | n/a      | n/a         | n/a         |
 
 #### Encoding
@@ -198,18 +198,18 @@ Encoding from an already parsed integer tile model:
 
 | Encoder                                | Time    | Throughput  | Compare     |
 |----------------------------------------|---------|-------------|-------------|
-| `fast-mvt`                             | 7.3 ms  | 117.3 MiB/s | -           |
-| `tinymvt 0.3.0`                        | 14.2 ms | 60.4 MiB/s  | 1.9x slower |
-| `mvt 0.15.0`                           | 23.7 ms | 36.1 MiB/s  | 3.2x slower |
+| `fast-mvt`                             | 7.3 ms  | 117.9 MiB/s | -           |
+| `tinymvt 0.3.0`                        | 14.1 ms | 60.9 MiB/s  | 1.9x slower |
+| `mvt 0.15.0`                           | 23.5 ms | 36.5 MiB/s  | 3.2x slower |
 | `mvt-reader` <br/>encode not supported | n/a     | n/a         | n/a         |
 
 Encoding from an owned tile value. Note that "owned" benchmark includes deep-cloning of each tile, so it makes no sense to compare throughput between the owned vs referenced table above, only between different encoders.
 
 | Encoder                                | Time    | Throughput | Compare     |
 |----------------------------------------|---------|------------|-------------|
-| `fast-mvt`                             | 15.0 ms | 57.0 MiB/s | -           |
-| `tinymvt 0.3.0`                        | 23.6 ms | 36.3 MiB/s | 1.6x slower |
-| `mvt 0.15.0`                           | 32.9 ms | 26.0 MiB/s | 2.2x slower |
+| `fast-mvt`                             | 14.7 ms | 58.2 MiB/s | -           |
+| `tinymvt 0.3.0`                        | 23.1 ms | 37.1 MiB/s | 1.6x slower |
+| `mvt 0.15.0`                           | 32.8 ms | 26.1 MiB/s | 2.2x slower |
 | `mvt-reader` <br/>encode not supported | n/a     | n/a        | n/a         |
 
 ## Features
