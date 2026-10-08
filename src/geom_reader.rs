@@ -309,11 +309,6 @@ mod tests {
             Err(MvtError::InvalidGeometry)
         ));
     }
-}
-
-#[cfg(test)]
-mod allocation_tests {
-    use super::*;
 
     #[test]
     fn ring_capacity_includes_closure_without_spare_coordinates() {
