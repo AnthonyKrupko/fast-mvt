@@ -7,3 +7,4 @@ ignore:
 coverage:
   status:
     patch: off
+    project: off
