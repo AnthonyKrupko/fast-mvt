@@ -29,6 +29,8 @@ const LAYER_VERSION: u32 = 2;
 pub struct MvtTileBuilder {
     /// The encoded `Tile.layers` fields so far.
     buf: Vec<u8>,
+    /// Keys the next layer starts with, in this order, whether or not a feature uses them.
+    next_keys: Vec<Box<str>>,
 }
 
 impl MvtTileBuilder {
@@ -37,12 +39,18 @@ impl MvtTileBuilder {
         Self::default()
     }
 
+    /// Makes the next layer list `keys` first, in this order, **even those no feature uses**
+    pub fn preset_keys<'k>(&mut self, keys: impl IntoIterator<Item = &'k str>) -> &mut Self {
+        self.next_keys = keys.into_iter().map(Box::from).collect();
+        self
+    }
+
     pub fn layer(self, name: impl Into<String>) -> MvtResult<MvtLayerBuilder> {
         let name = name.into();
         if name.is_empty() {
             return Err(MvtError::MissingLayerName);
         }
-        Ok(MvtLayerBuilder::with_tile(self, name))
+        MvtLayerBuilder::with_tile(self, name)
     }
 
     #[must_use]
@@ -111,17 +119,22 @@ impl MvtLayerBuilder {
         MvtTileBuilder::new().layer(name)
     }
 
-    fn with_tile(tile: MvtTileBuilder, name: String) -> Self {
-        Self {
+    fn with_tile(mut tile: MvtTileBuilder, name: String) -> MvtResult<Self> {
+        let mut keys = HashMap::default();
+        for key in std::mem::take(&mut tile.next_keys) {
+            let idx = u32_index(keys.len())?;
+            keys.entry(key).or_insert(idx);
+        }
+        Ok(Self {
             tile,
             name,
             extent: DEFAULT_EXTENT.get(),
             features: Vec::new(),
             num_features: 0,
-            keys: HashMap::default(),
+            keys,
             values: ValueIndex::default(),
             feature: FeatureBuf::default(),
-        }
+        })
     }
 
     pub fn extent(&mut self, extent: MvtExtent) -> &mut Self {
@@ -527,6 +540,53 @@ mod tests {
             feature.layer.feature.tags,
             vec![0, 0, 0, 1, 1, 0, 2, 2, 2, 3, 3, 4, 3, 4]
         );
+    }
+
+    #[test]
+    #[cfg(feature = "reader")]
+    fn preset_keys_start_the_next_layer_only() {
+        let mut tile = MvtTileBuilder::new();
+        tile.preset_keys(["id", "name", "kind"]);
+        let mut feature = tile
+            .layer("first")
+            .unwrap()
+            .feature(&MvtGeometry::Point(point! { x: 1, y: 2 }))
+            .unwrap();
+        feature.tag("extra", MvtValue::Int(1)).unwrap();
+        feature.tag("name", MvtValue::String("a".into())).unwrap();
+        let mut feature = feature
+            .end()
+            .layer("second")
+            .unwrap()
+            .feature(&MvtGeometry::Point(point! { x: 3, y: 4 }))
+            .unwrap();
+        feature.tag("name", MvtValue::String("b".into())).unwrap();
+        let bytes = feature.end().encode();
+
+        let reader = crate::MvtReaderRef::new(&bytes).unwrap();
+        insta::assert_debug_snapshot!(reader, @r#"
+        layer: 0
+          name: first
+          version: 2
+          extent: 4096
+          key table: ["id", "name", "kind", "extra"]
+          feature: 0
+            id: (none)
+            geometry: POINT(1,2)
+            properties:
+              extra = 1 (int)
+              name = "a"
+        =============================================================
+        layer: 1
+          name: second
+          version: 2
+          extent: 4096
+          feature: 0
+            id: (none)
+            geometry: POINT(3,4)
+            properties:
+              name = "b"
+        "#);
     }
 
     #[test]
