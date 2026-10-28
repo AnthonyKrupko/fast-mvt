@@ -624,7 +624,7 @@ mod tests {
     #[cfg(feature = "reader")]
     fn preset_keys_start_the_next_layer_only() {
         let mut tile = MvtTileBuilder::new();
-        tile.preset_keys(["id", "name", "kind"]);
+        tile.preset_keys(["id", "name", "kind", "name"]);
         let mut feature = tile
             .layer("first")
             .unwrap()
