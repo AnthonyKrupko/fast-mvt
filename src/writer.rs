@@ -11,6 +11,7 @@ use buffa::types::{
     put_string_field, put_uint32_field, put_uint64_field, sint64_encoded_len, string_encoded_len,
     uint32_encoded_len, uint64_encoded_len,
 };
+use usize_cast::IntoUsize as _;
 
 use crate::generated::vector_tile::tile::GeomType;
 use crate::geom_writer::{GeometryBuf, u32_index};
@@ -182,8 +183,7 @@ impl MvtLayerBuilder {
             values,
             ..
         } = self;
-        let mut keys: Vec<_> = keys.into_iter().collect();
-        keys.sort_unstable_by_key(|(_, idx)| *idx);
+        let keys = by_index(keys.len(), keys.into_iter().map(|(key, idx)| (idx, key)));
         let values = values.into_ordered();
 
         let len = 1
@@ -191,7 +191,7 @@ impl MvtLayerBuilder {
             + features.len()
             + keys
                 .iter()
-                .map(|(key, _)| 1 + string_encoded_len(key))
+                .map(|key| 1 + string_encoded_len(key))
                 .sum::<usize>()
             + values
                 .iter()
@@ -210,7 +210,7 @@ impl MvtLayerBuilder {
         put_len_delimited_header(3, len as u64, buf);
         put_string_field(1, &name, buf);
         buf.extend_from_slice(&features);
-        for (key, _) in &keys {
+        for key in &keys {
             put_string_field(3, key, buf);
         }
         for value in &values {
@@ -261,6 +261,7 @@ impl MvtLayerBuilder {
             + packed_field_len(geometry_len);
 
         let buf = &mut self.features;
+        buf.reserve(1 + varint_len(len as u64) + len);
         put_len_delimited_header(2, len as u64, buf);
         if let Some(id) = *id {
             put_uint64_field(1, id, buf);
@@ -448,12 +449,12 @@ impl ValueIndex {
     }
 
     fn into_ordered(self) -> Vec<LayerValue> {
-        let mut values: Vec<_> = (self.strings.into_iter())
-            .map(|(value, idx)| (idx, LayerValue::String(value)))
-            .chain((self.scalars.into_iter()).map(|(value, idx)| (idx, LayerValue::Scalar(value))))
-            .collect();
-        values.sort_unstable_by_key(|(idx, _)| *idx);
-        values.into_iter().map(|(_, value)| value).collect()
+        let len = self.strings.len() + self.scalars.len();
+        let strings =
+            (self.strings.into_iter()).map(|(value, idx)| (idx, LayerValue::String(value)));
+        let scalars =
+            (self.scalars.into_iter()).map(|(value, idx)| (idx, LayerValue::Scalar(value)));
+        by_index(len, strings.chain(scalars))
     }
 }
 
@@ -461,6 +462,13 @@ impl ValueIndex {
 enum LayerValue {
     String(Box<str>),
     Scalar(Scalar),
+}
+
+/// A placeholder that does not allocate, for [`by_index`].
+impl Default for LayerValue {
+    fn default() -> Self {
+        Self::Scalar(Scalar::Bool(false))
+    }
 }
 
 impl LayerValue {
@@ -487,6 +495,15 @@ impl LayerValue {
             Self::Scalar(Scalar::Bool(value)) => put_bool_field(7, value, buf),
         }
     }
+}
+
+/// Orders `len` items numbered `0..len` by placing each at its index, which is cheaper than sorting.
+fn by_index<T: Default>(len: usize, items: impl IntoIterator<Item = (u32, T)>) -> Vec<T> {
+    let mut ordered: Vec<T> = std::iter::repeat_with(T::default).take(len).collect();
+    for (idx, item) in items {
+        ordered[idx.into_usize()] = item;
+    }
+    ordered
 }
 
 fn packed_len(values: &[u32]) -> usize {
