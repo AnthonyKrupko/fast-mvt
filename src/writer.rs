@@ -4,12 +4,11 @@
 use std::collections::HashMap as StdHashMap;
 
 use buffa::Enumeration as _;
-use buffa::encoding::varint_len;
+use buffa::encoding::{Tag, WireType, varint_len};
 use buffa::types::{
     int32_encoded_len, int64_encoded_len, put_bool_field, put_double_field, put_float_field,
     put_int32_field, put_int64_field, put_len_delimited_header, put_sint64_field, put_string_field,
-    put_uint32_field, put_uint64_field, sint64_encoded_len, string_encoded_len, uint32_encoded_len,
-    uint64_encoded_len,
+    put_uint32_field, put_uint64_field, sint64_encoded_len, string_encoded_len, uint64_encoded_len,
 };
 use usize_cast::IntoUsize as _;
 
@@ -25,6 +24,9 @@ type HashMap<K, V> = StdHashMap<K, V, foldhash::fast::RandomState>;
 
 /// MVT spec version written into every layer.
 const LAYER_VERSION: u32 = 2;
+
+/// The longest a varint can be, kept free for a layer's length until the layer ends.
+const MAX_VARINT_LEN: usize = 10;
 
 #[derive(Debug, Default)]
 pub struct MvtTileBuilder {
@@ -96,8 +98,8 @@ pub struct MvtLayerBuilder {
 struct LayerState {
     name: String,
     extent: u32,
-    /// The encoded `Layer.features` fields so far.
-    features: Vec<u8>,
+    /// Where the layer's length goes in the tile buffer, which holds the layer as it is written.
+    start: usize,
     num_features: usize,
     keys: KeyIndex,
     values: ValueIndex,
@@ -135,6 +137,10 @@ impl MvtLayerBuilder {
 
     fn with_tile(mut tile: MvtTileBuilder, name: String) -> MvtResult<Self> {
         let mut state = tile.spare.take().unwrap_or_default();
+        Tag::new(3, WireType::LengthDelimited).encode(&mut tile.buf);
+        state.start = tile.buf.len();
+        tile.buf.extend_from_slice(&[0; MAX_VARINT_LEN]);
+        put_string_field(1, &name, &mut tile.buf);
         state.name = name;
         state.extent = DEFAULT_EXTENT.get();
         for key in std::mem::take(&mut tile.next_keys) {
@@ -184,51 +190,31 @@ impl MvtLayerBuilder {
             mut tile,
             mut state,
         } = self;
-        let LayerState {
-            name,
-            extent,
-            features,
-            keys,
-            values,
-            ..
-        } = &mut *state;
-        let extent = *extent;
-        let keys = &keys.ordered;
-        let values = values.take_ordered();
-
-        let len = 1
-            + string_encoded_len(name)
-            + features.len()
-            + keys
-                .iter()
-                .map(|key| 1 + string_encoded_len(key))
-                .sum::<usize>()
-            + values
-                .iter()
-                .map(|value| {
-                    let len = value.encoded_len();
-                    1 + varint_len(len as u64) + len
-                })
-                .sum::<usize>()
-            + 1
-            + uint32_encoded_len(extent)
-            + 1
-            + uint32_encoded_len(LAYER_VERSION);
-
         let buf = &mut tile.buf;
-        buf.reserve(len + 10);
-        put_len_delimited_header(3, len as u64, buf);
-        put_string_field(1, name, buf);
-        buf.extend_from_slice(features);
-        for key in keys {
+        for key in &state.keys.ordered {
             put_string_field(3, key, buf);
         }
-        for value in &values {
+        for value in &state.values.take_ordered() {
             put_len_delimited_header(4, value.encoded_len() as u64, buf);
             value.write(buf);
         }
-        put_uint32_field(5, extent, buf);
+        put_uint32_field(5, state.extent, buf);
         put_uint32_field(15, LAYER_VERSION, buf);
+
+        // The layer's length goes into the room left for it, and the layer moves up to follow it.
+        let body = state.start + MAX_VARINT_LEN;
+        let mut len = (buf.len() - body) as u64;
+        let mut end = state.start;
+        while len >= 0x80 {
+            buf[end] = len.to_le_bytes()[0] | 0x80;
+            len >>= 7;
+            end += 1;
+        }
+        buf[end] = len.to_le_bytes()[0];
+        end += 1;
+        buf.copy_within(body.., end);
+        buf.truncate(buf.len() - (body - end));
+
         state.clear();
         tile.spare = Some(state);
         tile
@@ -276,7 +262,7 @@ impl MvtLayerBuilder {
             + int32_encoded_len(geom_type.to_i32())
             + packed_field_len(packed_geometry.len());
 
-        let buf = &mut self.state.features;
+        let buf = &mut self.tile.buf;
         buf.reserve(1 + varint_len(len as u64) + len);
         put_len_delimited_header(2, len as u64, buf);
         if let Some(id) = *id {
@@ -293,12 +279,9 @@ impl LayerState {
     /// Empties the layer for reuse, keeping the capacity of its tables and buffers.
     fn clear(&mut self) {
         self.name.clear();
-        self.features.clear();
         self.num_features = 0;
         self.keys.indices.clear();
         self.keys.ordered.clear();
-        self.values.strings.clear();
-        self.values.scalars.clear();
         self.feature.reset();
         self.feature.last_tags.clear();
     }
@@ -520,8 +503,11 @@ impl ValueIndex {
     /// The values in index order, leaving the index empty.
     fn take_ordered(&mut self) -> Vec<LayerValue> {
         let len = self.strings.len() + self.scalars.len();
-        let strings = (self.strings.drain()).map(|(value, idx)| (idx, LayerValue::String(value)));
-        let scalars = (self.scalars.drain()).map(|(value, idx)| (idx, LayerValue::Scalar(value)));
+        // Taken rather than drained, so that their tables are freed before the layer is written.
+        let strings = (std::mem::take(&mut self.strings).into_iter())
+            .map(|(value, idx)| (idx, LayerValue::String(value)));
+        let scalars = (std::mem::take(&mut self.scalars).into_iter())
+            .map(|(value, idx)| (idx, LayerValue::Scalar(value)));
         by_index(len, strings.chain(scalars))
     }
 }
@@ -577,8 +563,6 @@ fn by_index<T: Default>(len: usize, items: impl IntoIterator<Item = (u32, T)>) -
 /// Replaces the contents of `out` with `values` as varints.
 fn pack_varints(values: &[u32], out: &mut Vec<u8>) {
     out.clear();
-    // Room for the longest varints, so pushing never grows the vector.
-    out.reserve(values.len() * 5);
     for &value in values {
         let mut value = value;
         while value >= 0x80 {
